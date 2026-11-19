@@ -47,6 +47,38 @@ them to make a change pass.
 Use the issue templates. Include `npx fe-guard --version`, Node version, OS, the config, and
 the relevant `.fe-guard/report.json` (run with `FE_GUARD_DEBUG=1` for MCP issues).
 
+## Releasing
+
+1. Bump the version in `package.json` and in both `version` fields of `package-lock.json`;
+   add a `CHANGELOG.md` entry.
+2. Run `npm run verify:local`; also run `npm run verify:ts7` when the TypeScript adapter or
+   its supported versions changed.
+3. Commit, push, and wait for the CI matrix to pass.
+4. Build the tarball (`npm pack`) and create the release:
+
+   ```bash
+   gh release create v<version> fe-guard-<version>.tgz \
+     --title "fe-guard v<version>" --notes-file <notes.md>
+   ```
+
+Keep release notes **short**: a runnable quick start plus a link into the README. Detailed
+usage (tool table, manual MCP config, macOS PATH notes) lives only in the README so there is
+a single source of truth; repeating it per release makes it drift.
+
+```markdown
+## Install
+
+    npm i -D github:luffy-lcc/fe-guard   # or the attached tarball
+    npx fe-guard init                     # writes .trae/mcp.json / .cursor/mcp.json
+
+Reload the IDE's MCP panel to get 7 tools (`task_*` + `ui_lookup`).
+Setup details, manual config and macOS PATH notes:
+[README → Use in AI IDEs](https://github.com/luffy-lcc/fe-guard#use-in-ai-ides-mcp)
+
+## Fixed / Changed
+...
+```
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the MIT License.

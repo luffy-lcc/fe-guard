@@ -39,6 +39,35 @@
 
 使用 issue 模板。附上 `npx fe-guard --version`、Node 版本、OS、配置，以及相关的 `.fe-guard/report.json`（MCP 问题加 `FE_GUARD_DEBUG=1` 运行）。
 
+## 发版
+
+1. 更新 `package.json` 与 `package-lock.json` 中两处 `version`；在 `CHANGELOG.md` 加条目。
+2. 跑 `npm run verify:local`；如果改动了 TypeScript 适配器或其支持版本，再跑 `npm run verify:ts7`。
+3. 提交、推送，等 CI 矩阵全部通过。
+4. 打包并创建 Release：
+
+   ```bash
+   npm pack
+   gh release create v<version> fe-guard-<version>.tgz \
+     --title "fe-guard v<version>" --notes-file <notes.md>
+   ```
+
+Release 说明要**短**：一段可直接运行的 quick start + 指向 README 的链接。详细用法（工具表、手动 MCP 配置、macOS 路径问题）只放在 README，保持唯一事实源；每版重复抄写只会失配。
+
+```markdown
+## Install
+
+    npm i -D github:luffy-lcc/fe-guard   # 或用附件里的 tarball
+    npx fe-guard init                     # 写入 .trae/mcp.json / .cursor/mcp.json
+
+重载 IDE 的 MCP 面板即可获得 7 个工具（`task_*` + `ui_lookup`）。
+接入细节、手动配置与 macOS 路径问题见
+[README → 在 AI IDE 里使用](https://github.com/luffy-lcc/fe-guard/blob/main/README.zh-CN.md#在-ai-ide-里使用mcp)
+
+## Fixed / Changed
+...
+```
+
 ## 许可证
 
 贡献即表示你同意你的贡献以 MIT 许可证授权。

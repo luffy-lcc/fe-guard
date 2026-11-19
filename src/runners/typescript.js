@@ -53,7 +53,14 @@ async function runPackage({ root, check, pkg, packageMode, timings }) {
   const bin = check.bin ?? (isVue ? 'vue-tsc' : 'tsc')
   const resolved = resolveBinFrom(root, pkg.dir, bin)
 
-  if (isVue && !check.bin) assertVueTscCompatibility(root, pkg)
+  // 显式指定了非 vue-tsc 的 bin 时尊重用户选择，但必须把“.vue 没被检查”说清楚，避免静默漏检。
+  if (isVue && check.bin && check.bin !== 'vue-tsc') {
+    console.error(
+      `fe-guard: 提示 ${pkg.rel || '仓库根'} 是 Vue 项目，但 checks.typescript.bin 显式指定为 "${check.bin}"，` +
+        '.vue 不会被类型检查。删掉该字段可自动切换 vue-tsc，或把 checks.typescript.vue 设为 false 明确接受这个缺口。',
+    )
+  }
+  if (isVue && (!check.bin || check.bin === 'vue-tsc')) assertVueTscCompatibility(root, pkg)
 
   const started = now()
   const result = await run(resolved, check.args ?? DEFAULT_ARGS, {
@@ -89,7 +96,7 @@ async function runPackage({ root, check, pkg, packageMode, timings }) {
             `检测到 Vue 项目（${vueFiles > 0 ? `${vueFiles} 个 .vue 文件` : '依赖 vue'}），` +
             `但类型检查器 "${bin}" 不可用：本次没有检查 .vue，属于“类型门禁未生效”，因此判失败。`,
           fix:
-            `在 ${pkg.rel || '仓库根'} 安装 vue-tsc：npm i -D vue-tsc（Vue 3 + TS 5 用 2.x，Vue 2.7 用 1.8.x）；` +
+            `在 ${pkg.rel || '仓库根'} 安装 vue-tsc：npm i -D vue-tsc（Vue 3 + TS 5 用 2.x 或 3.x，Vue 2.7 用 1.8.x）；` +
             '确实不想检查 .vue 时，把 checks.typescript.vue 设为 false，并在评审里明确接受这个缺口。',
         },
       ]
@@ -128,7 +135,7 @@ function pathOf(file) {
   return file || 'tsconfig.json'
 }
 
-/** vue-tsc 2.x 需要 TS >= 5；Vue 2 需要 vue-tsc 1.x。版本不匹配时直接拒绝，避免“跑了但类型没查”。 */
+/** vue-tsc 2.x/3.x 需要 TS >= 5 且 < 7；Vue 2 需要 vue-tsc 1.x。版本不匹配时直接拒绝，避免“跑了但类型没查”。 */
 function assertVueTscCompatibility(root, pkg) {
   const vueTscVersion = installedVersion(root, pkg.dir, 'vue-tsc')
   const tsVersion = installedVersion(root, pkg.dir, 'typescript')
@@ -136,6 +143,14 @@ function assertVueTscCompatibility(root, pkg) {
   const vueTscMajor = majorOf(vueTscVersion)
   const tsMajor = majorOf(tsVersion)
   const vueMajor = majorOf(vueVersion)
+
+  if (tsMajor && tsMajor >= 7) {
+    throw new UserError(
+      `${pkg.rel || '仓库根'} 安装的是 TypeScript ${tsVersion}，但 vue-tsc ${vueTscVersion ?? ''} 目前不支持 TypeScript 7。\n` +
+        '  TypeScript 7（Go 原生编译器）不再导出 typescript/lib/tsc，vue-tsc 启动即崩溃。\n' +
+        '  请安装 typescript@5.x：npm i -D typescript@5；非 Vue 项目可以直接使用 TypeScript 7。',
+    )
+  }
 
   if (vueTscMajor && vueTscMajor >= 2) {
     if (tsMajor && tsMajor < 5) {

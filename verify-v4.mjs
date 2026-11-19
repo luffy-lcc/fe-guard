@@ -181,7 +181,7 @@ const VUE_APP = freshDir('vue-app')
     name: 'vue-fixture',
     private: true,
     dependencies: { vue: '^3.4.0' },
-    devDependencies: { 'vue-tsc': '^2.0.0', typescript: '^5.0.0' },
+    devDependencies: { 'vue-tsc': '^3.0.0', typescript: '^5.0.0' },
   })
   writeJson(path.join(app, 'tsconfig.json'), {
     compilerOptions: {

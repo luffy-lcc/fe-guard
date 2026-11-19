@@ -22,7 +22,6 @@
     "typescript": {
       "enabled": true,
       "level": "error",
-      "bin": "tsc",
       "args": ["--noEmit", "--pretty", "false", "-p", "tsconfig.json"],
       "vue": "auto",
       "workspace": "auto"
@@ -105,7 +104,7 @@
 | `enabled` | 全局总开关。`false` 时 `check` 直接通过（退出码 0，报告标记 `skipped`），用于紧急止血 |
 | `checks.<name>.enabled` | 单项开关，缺省视为关闭。旧配置里没有 `deps` / `ui` / `metrics` / `diff-size`，升级后它们默认关闭，不会突然全红 |
 | `checks.<name>.level` | `error` 或 `warn`。`warn` 时该项的新增违规只报告、不阻断 |
-| `checks.<name>.bin` / `args` | 实际执行的命令。默认优先用项目内 `node_modules/.bin` 下的同名命令，找不到才走 PATH（仅外部三项） |
+| `checks.<name>.bin` / `args` | 实际执行的命令。默认优先用项目内 `node_modules/.bin` 下的同名命令，找不到才走 PATH（仅外部三项）。`typescript` 的 `bin` **留空**即可自动选择（Vue 项目 → `vue-tsc`，否则 `tsc`）；显式写 `"bin": "tsc"` 会关闭 Vue 自动切换，`.vue` 将不被类型检查 |
 | `checks.eslint.targets` | 全量检查时 ESLint 扫哪些目录。空数组 = 自动：有 `src/` 只扫 `src/`，否则扫仓库根，避免把 `dist/`、`docker/static` 一起 lint |
 | `checks.eslint.workspace` | `auto`（默认）时识别 monorepo 并按 package 各用自己的配置执行；`root` 退回「只在仓库根跑一次」 |
 | `checks.typescript.vue` | `auto`（默认）检测到 Vue 就切 `vue-tsc`，`.vue` 里的类型错误会被检查；`false` 明确接受只跑 `tsc` |
@@ -158,9 +157,10 @@
 
 Vue 项目检测到 `.vue` 文件或依赖里有 `vue` 时，TypeScript 检查自动改为 `vue-tsc --noEmit`，`<script setup>` 和 `<template>` 里的类型错误都会被检查。关键安全底线：**项目里有 `.vue`，但 vue-tsc 没装/不可执行时，检查会失败**，并报一条永远不能进 baseline 的 `typescript/vue-tsc-missing`。
 
-- Vue 3 + TS 5：`npm i -D vue-tsc typescript`（vue-tsc 2.x）
+- Vue 3 + TS 5：`npm i -D vue-tsc typescript`（vue-tsc 2.x 或 3.x）
 - Vue 2.7 / 旧 TS：`npm i -D vue-tsc@1.8`
-- 版本不匹配（vue-tsc 2.x + TS 4.x、Vue 2 + vue-tsc 2.x）会直接报错，而不是跑出一个假结果
+- **TypeScript 7 目前不被任何 vue-tsc 版本支持**（TS 7 不再导出 `typescript/lib/tsc`），Vue 项目需停留在 `typescript@5`
+- 版本不匹配（vue-tsc 2.x + TS 4.x、Vue 2 + vue-tsc 2.x、Vue + TS 7）会直接报错，而不是跑出一个假结果
 - 明确接受“不检查 `.vue`”：`"checks": { "typescript": { "vue": false } }`
 
 **架构边界（boundaries）与 Vue**：depcruise 需要能从它自己的安装位置解析到 `@vue/compiler-sfc`（Vue 2 用 `vue-template-compiler`）才会把 `.vue` 纳入依赖图。缺失时它不报错、只是静默跳过 `.vue`——fe-guard 会对比磁盘与入图的 `.vue` 数量，不完整即报 `boundaries/not-executed`，不会给一个假 0。depcruise 18 起 tsconfig 别名写法是 `options.tsConfig: { fileName: 'tsconfig.json' }`（旧版 `tsConfigFile` 已废弃，非法配置会被 schema 校验拒绝）。

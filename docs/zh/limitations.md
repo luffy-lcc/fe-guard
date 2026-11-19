@@ -39,7 +39,8 @@
 - **monorepo 的 ESLint 耗时由项目自己的配置决定**。Repo B 的 5 个 package 并行仍要约 26s，因为两个 app 开了 type-aware 规则、扫 18 万行；fe-guard 的编排开销只有约 3s，不是瓶颈。
 - **没有 ESLint 配置的 package 会被跳过**，报告里会列出跳过名单（`--diff-only` / `--staged` 也会记录 `skipped`，不会整类静默消失）；包里有配置却执行失败时会带包名失败。
 - **没有 tsconfig 的 package 在 monorepo 下跳过**；如果根目录也没有 tsconfig 可跑，单仓库模式仍会报「找不到 tsconfig」。
-- **vue-tsc 的版本兼容是有限的**。只处理了常见组合：Vue 3 + TS 5 用 vue-tsc 2.x，Vue 2.7 / 旧 TS 用 vue-tsc 1.8。`vue-tsc 2.x + TS 4.x`、`Vue 2 + vue-tsc 2.x` 会直接报错；更老的组合（Vue 2.6 及以下）建议显式设 `typescript.vue: false`。项目里 `.vue` 存在但 vue-tsc 未安装时，会失败并报 `typescript/vue-tsc-missing`，该条永远不进 baseline。
+- **vue-tsc 的版本兼容是有限的**。已验证的组合：Vue 3 + TS 5 用 vue-tsc 2.x 或 3.x，Vue 2.7 / 旧 TS 用 vue-tsc 1.8。**TypeScript 7 目前不被任何 vue-tsc 版本支持**——TS 7（Go 原生编译器）不再导出 `typescript/lib/tsc`，而所有 vue-tsc 启动时都要解析它，因此检查会直接给出明确报错而不是崩溃。`vue-tsc 2.x + TS 4.x`、`Vue 2 + vue-tsc 2.x`、`Vue + TS 7` 都会直接报错；更老的组合（Vue 2.6 及以下）建议显式设 `typescript.vue: false`。项目里 `.vue` 存在但 vue-tsc 未安装时，会失败并报 `typescript/vue-tsc-missing`，该条永远不进 baseline。非 Vue 项目可以直接使用 TypeScript 7——tsc 的诊断格式没有变化。
+- **显式写 `checks.typescript.bin` 会关闭 Vue 自动切换**。`init` 不再写 `bin`，Vue 项目自动选 `vue-tsc`；如果你自己写了 `"bin": "tsc"`，fe-guard 会尊重该配置，但会提示 `.vue` 不会被类型检查，实际只检查 tsconfig 覆盖的非 SFC 文件。
 - **vue-tsc 的检查范围等于项目自己的 tsconfig**。`include` 没覆盖到的 `.vue` 不会被检查；monorepo 下每个 package 用各自的 `tsconfig.json`。
 
 ## 本地执行与流程层的限制

@@ -70,7 +70,9 @@ export function defaultChecks() {
     typescript: {
       enabled: true,
       level: 'error',
-      bin: 'tsc',
+      // 省略 bin：运行时自动选择（Vue 项目 → vue-tsc，否则 tsc）。
+      // 显式写 bin（例如 "tsc"）会覆盖自动选择，Vue 项目的 .vue 将不再被检查。
+      bin: undefined,
       args: ['--noEmit', '--pretty', 'false', '-p', 'tsconfig.json'],
       // auto = 检测到 Vue 后自动换 vue-tsc；false = 明确只用 tsc（不检查 .vue，自行承担）。
       vue: 'auto',

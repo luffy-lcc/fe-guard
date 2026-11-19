@@ -22,7 +22,6 @@ Configuration is JSON, not YAML: zero dependencies (no hand-written YAML-subset 
     "typescript": {
       "enabled": true,
       "level": "error",
-      "bin": "tsc",
       "args": ["--noEmit", "--pretty", "false", "-p", "tsconfig.json"],
       "vue": "auto",
       "workspace": "auto"
@@ -105,7 +104,7 @@ Configuration is JSON, not YAML: zero dependencies (no hand-written YAML-subset 
 | `enabled` | Global master switch. When `false`, `check` passes immediately (exit code 0, report marked `skipped`) — an emergency stopgap |
 | `checks.<name>.enabled` | Per-check switch; absent means disabled. Old configs lack `deps` / `ui` / `metrics` / `diff-size`; after upgrading they stay disabled by default, so nothing suddenly turns all red |
 | `checks.<name>.level` | `error` or `warn`. With `warn`, new violations from this check are reported but do not block |
-| `checks.<name>.bin` / `args` | The command actually executed. By default the same-named command in the project's `node_modules/.bin` is preferred; PATH is the fallback (external three checks only) |
+| `checks.<name>.bin` / `args` | The command actually executed. By default the same-named command in the project's `node_modules/.bin` is preferred; PATH is the fallback (external three checks only). For `typescript`, **omit `bin`** so the check auto-selects `vue-tsc` for Vue projects and `tsc` otherwise; writing `"bin": "tsc"` explicitly disables the Vue switch and `.vue` files won't be type-checked |
 | `checks.eslint.targets` | Which directories ESLint scans in a full check. Empty array = auto: scan only `src/` if it exists, otherwise the repo root — avoids linting `dist/` or `docker/static` along the way |
 | `checks.eslint.workspace` | `auto` (default) detects monorepos and runs per package with each package's own config; `root` falls back to "run once at the repo root" |
 | `checks.typescript.vue` | `auto` (default) switches to `vue-tsc` when Vue is detected, so type errors inside `.vue` are checked; `false` explicitly accepts running `tsc` only |
@@ -158,9 +157,10 @@ To fall back to "run once at the repo root":
 
 When a Vue project is detected (`.vue` files present, or `vue` in dependencies), the TypeScript check automatically switches to `vue-tsc --noEmit`, checking type errors in both `<script setup>` and `<template>`. The key safety floor: **if the project has `.vue` files but vue-tsc is not installed / not executable, the check fails**, reporting a `typescript/vue-tsc-missing` that can never enter the baseline.
 
-- Vue 3 + TS 5: `npm i -D vue-tsc typescript` (vue-tsc 2.x)
+- Vue 3 + TS 5: `npm i -D vue-tsc typescript` (vue-tsc 2.x or 3.x)
 - Vue 2.7 / older TS: `npm i -D vue-tsc@1.8`
-- Version mismatches (vue-tsc 2.x + TS 4.x, Vue 2 + vue-tsc 2.x) error out directly instead of producing a fake result
+- **TypeScript 7 is not supported by any vue-tsc version yet** (TS 7 no longer exports `typescript/lib/tsc`); Vue projects must stay on `typescript@5`
+- Version mismatches (vue-tsc 2.x + TS 4.x, Vue 2 + vue-tsc 2.x, Vue + TS 7) error out directly instead of producing a fake result
 - Explicitly accept "don't check `.vue`": `"checks": { "typescript": { "vue": false } }`
 
 **Architecture boundaries (boundaries) and Vue**: depcruise only includes `.vue` in the dependency graph if it can resolve `@vue/compiler-sfc` (or `vue-template-compiler` for Vue 2) from its own install location. When missing, it does not error — it silently skips `.vue`. fe-guard compares the `.vue` count on disk with the count in the graph; if incomplete it reports `boundaries/not-executed` rather than a fake 0. Since depcruise 18, tsconfig aliases are written as `options.tsConfig: { fileName: 'tsconfig.json' }` (the old `tsConfigFile` is deprecated; invalid configs are rejected by schema validation).

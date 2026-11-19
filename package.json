@@ -1,6 +1,6 @@
 {
   "name": "fe-guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turn frontend conventions into an executable quality gate: orchestrate ESLint/tsc/dependency-cruiser, freeze legacy debt with a baseline ratchet that only blocks new violations, and enforce an AI development workflow via MCP tools.",
   "keywords": [
     "frontend",
@@ -60,6 +60,6 @@
   "devDependencies": {
     "typescript": "^5.9.3",
     "vue": "^3.5.45",
-    "vue-tsc": "^2.2.12"
+    "vue-tsc": "^3.3.14"
   }
 }

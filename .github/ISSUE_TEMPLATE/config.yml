@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: FAQ & troubleshooting
+    url: https://github.com/luffy-lcc/fe-guard/blob/main/docs/faq.md
+    about: Check the FAQ first — most setup and MCP issues are covered there.
+  - name: Documentation
+    url: https://github.com/luffy-lcc/fe-guard/blob/main/README.md#documentation
+    about: Guides for checks, baseline, workflow, configuration, and adoption.

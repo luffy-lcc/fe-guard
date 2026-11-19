@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# 本地提交前钩子示例（Husky v9）
+#
+# 安装：
+#   npm i -D husky && npx husky init
+#   cp examples/husky-pre-commit .husky/pre-commit && chmod +x .husky/pre-commit
+#
+# 只检查本次暂存的源文件，并走 fast 档：不跑 tsc / 边界 / 大 diff，目标 3 秒内。
+# 需要连未暂存的改动一起查时，把 --staged 换成 --diff-only。
+npx fe-guard check --staged --profile fast

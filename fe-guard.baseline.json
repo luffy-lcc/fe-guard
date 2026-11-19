@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "note": "由 fe-guard 生成。entries 是「文件 + 规则 -> 允许的违规条数」；ratchets 是「文件 + 指标 -> 允许的最大值」（单文件行数、重复率等）。两者都只会自动收紧，不会自动放宽。firstSeen 是首次入账日期；widenLog 记录每次显式放宽，供 CI 审计。",
+  "entries": {},
+  "ratchets": {}
+}

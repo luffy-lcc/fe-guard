@@ -1,0 +1,65 @@
+{
+  "name": "fe-guard",
+  "version": "0.1.0",
+  "description": "Turn frontend conventions into an executable quality gate: orchestrate ESLint/tsc/dependency-cruiser, freeze legacy debt with a baseline ratchet that only blocks new violations, and enforce an AI development workflow via MCP tools.",
+  "keywords": [
+    "frontend",
+    "quality-gate",
+    "eslint",
+    "typescript",
+    "baseline",
+    "ratchet",
+    "mcp",
+    "ai-code-quality",
+    "dependency-cruiser",
+    "monorepo",
+    "vue",
+    "code-quality",
+    "technical-debt"
+  ],
+  "author": "fe-guard contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luffy-lcc/fe-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luffy-lcc/fe-guard/issues"
+  },
+  "homepage": "https://github.com/luffy-lcc/fe-guard#readme",
+  "type": "module",
+  "files": [
+    "bin/",
+    "src/",
+    "examples/",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "bin": {
+    "fe-guard": "./bin/fe-guard.js",
+    "fe-guard-mcp": "./bin/fe-guard-mcp.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "verify": "bash verify.sh",
+    "verify:v2": "node verify-v2.mjs",
+    "verify:v3": "node verify-v3.mjs",
+    "verify:v4": "node verify-v4.mjs",
+    "verify:all": "bash verify.sh && node verify-v2.mjs && node verify-v3.mjs && node verify-v4.mjs",
+    "verify:local": "npm test && npm run verify:all && npm run self-check",
+    "baseline:verify": "node bin/fe-guard.js baseline --verify",
+    "self-check": "node bin/fe-guard.js check --profile fast",
+    "doctor": "node bin/fe-guard.js doctor",
+    "hooks:install": "mkdir -p .git/hooks && cp .husky/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vue": "^3.5.45",
+    "vue-tsc": "^2.2.12"
+  }
+}

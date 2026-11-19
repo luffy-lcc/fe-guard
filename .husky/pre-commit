@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# fe-guard 自身的提交前钩子：只查暂存文件，不让历史存量挡住提交。
+# 安装：npm run hooks:install
+node bin/fe-guard.js check --staged --profile fast

@@ -1,0 +1,12 @@
+{
+  "name": "fe-guard-sample-app",
+  "private": true,
+  "type": "module",
+  "description": "fe-guard 的验证样例：一个带存量违规的小型前端工程",
+  "devDependencies": {
+    "dependency-cruiser": "^16.10.4",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.2"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "checks": {
+    "eslint": { "enabled": false },
+    "typescript": { "enabled": false },
+    "boundaries": { "enabled": false },
+    "deps": { "enabled": true, "level": "error" },
+    "ui": { "enabled": true, "level": "error" },
+    "metrics": { "enabled": true, "level": "error" },
+    "diff-size": { "enabled": true, "level": "error" }
+  }
+}

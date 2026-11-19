@@ -1,0 +1,13 @@
+node_modules/
+.verify-tmp/
+.verify-v2-tmp/
+.verify-v3-tmp/
+.verify-v4-tmp/
+.fe-guard/
+.fe-guard-tools/
+.trae/
+coverage/
+*.tgz
+*.log
+.DS_Store
+examples/sample-app/node_modules/

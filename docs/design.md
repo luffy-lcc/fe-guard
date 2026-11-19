@@ -61,7 +61,8 @@ fe-guard/
 ├── verify.sh                    v1 one-command real verification (checks + ratchet)
 ├── verify-v2.mjs                v2 one-command real verification (MCP protocol + counterexamples + artifacts)
 ├── verify-v3.mjs                v3 one-command real verification (positive/negative cases for the four new checks + incremental adoption + per-check disable)
-└── verify-v4.mjs                v4 one-command real verification (monorepo / vue-tsc / first-run view / baseline / false positives)
+├── verify-v4.mjs                v4 one-command real verification (monorepo / vue-tsc / first-run view / baseline / false positives)
+└── verify-ts7.mjs               TypeScript 7 smoke test (non-Vue: real tsc 7 diagnostics still parse)
 ```
 
 Come back after two months away and you only need four places: `src/baseline.js` (ratchet semantics), `src/workflow/state.js` (how stages are derived), `src/workflow/tools.js` (which operations get rejected), `src/runners/*` (tool adapters). Every file is kept under 500 lines (the same constraint self-check enforces).
@@ -75,6 +76,7 @@ npm run verify         # v1: copy the sample project into a temp dir, run full s
 npm run verify:v2      # v2: full session over the real MCP protocol + counterexamples + artifacts
 npm run verify:v3      # v3: positive/negative cases for the four new checks + incremental adoption + per-check disable
 npm run verify:v4      # v4: per-package monorepo runs + planted .vue type errors + first-run view + false-positive loop
+npm run verify:ts7     # TS 7 smoke test: real typescript@7 diagnostics still parse (needs network)
 npm run self-check     # check fe-guard itself with its fast profile
 ```
 

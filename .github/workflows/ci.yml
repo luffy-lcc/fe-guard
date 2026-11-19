@@ -25,3 +25,19 @@ jobs:
           git config --global user.name "CI"
       - run: npm ci
       - run: npm run verify:local
+
+  # TypeScript 7 是 Go 原生编译器，诊断输出格式若漂移会让适配器解析不到任何诊断。
+  # 这条 job 用真实安装的 typescript@7 守住“非 Vue 项目可直接用 TS 7”的承诺。
+  typescript-7:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Configure git identity (the smoke test creates a temp repo)
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI"
+      - name: TypeScript 7 smoke test (non-Vue)
+        run: node verify-ts7.mjs

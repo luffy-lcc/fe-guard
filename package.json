@@ -49,6 +49,7 @@
     "verify:v2": "node verify-v2.mjs",
     "verify:v3": "node verify-v3.mjs",
     "verify:v4": "node verify-v4.mjs",
+    "verify:ts7": "node verify-ts7.mjs",
     "verify:all": "bash verify.sh && node verify-v2.mjs && node verify-v3.mjs && node verify-v4.mjs",
     "verify:local": "npm test && npm run verify:all && npm run self-check",
     "baseline:verify": "node bin/fe-guard.js baseline --verify",

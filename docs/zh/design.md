@@ -61,7 +61,8 @@ fe-guard/
 ├── verify.sh                    v1 一键真实验证（检查 + 棘轮）
 ├── verify-v2.mjs                v2 一键真实验证（MCP 协议 + 反例 + 生成物）
 ├── verify-v3.mjs                v3 一键真实验证（四项新检查的正反例 + 增量接入 + 单项关闭）
-└── verify-v4.mjs                v4 一键真实验证（monorepo / vue-tsc / 首次视图 / baseline / 误报）
+├── verify-v4.mjs                v4 一键真实验证（monorepo / vue-tsc / 首次视图 / baseline / 误报）
+└── verify-ts7.mjs               TypeScript 7 冒烟验证（非 Vue：真实 tsc 7 的诊断仍能解析）
 ```
 
 停两个月再回来，只需要看四个地方：`src/baseline.js`（棘轮语义）、`src/workflow/state.js`（阶段怎么推导）、`src/workflow/tools.js`（哪些操作会被拒）、`src/runners/*`（工具适配）。每个文件都控制在 500 行内（自检同款约束）。
@@ -75,6 +76,7 @@ npm run verify         # v1：临时目录复制样例工程，跑完整场景�
 npm run verify:v2      # v2：真实 MCP 协议跑完整会话 + 反例 + 生成物
 npm run verify:v3      # v3：四项新检查的正反例 + 增量接入 + 单项关闭
 npm run verify:v4      # v4：monorepo 按包执行 + 植入 .vue 类型错误 + 首次视图 + 误报闭环
+npm run verify:ts7     # TS 7 冒烟：真实 typescript@7 的诊断仍能解析（需要网络）
 npm run self-check     # 用 fe-guard 的 fast 档检查自己
 ```
 

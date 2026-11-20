@@ -30,7 +30,7 @@ ESLint 会只跑变更文件，但 tsc 和 dependency-cruiser 仍需要全量分
 dependency-cruiser 的 JSON 不提供行号，只有「谁依赖了谁」。ESLint 和 tsc 的违规都有行号。
 
 **Trae / Cursor 的 MCP 面板里看不到 fe-guard**
-先确认项目根有 `.trae/mcp.json` / `.cursor/mcp.json`，并且里面有 `mcpServers.fe-guard`；然后重载项目。手动验证 server 能否启动：`node ./node_modules/fe-guard/bin/fe-guard-mcp.js`（它会等 stdin 输入，Ctrl+C 退出），或 `npx fe-guard mcp`。排查时加环境变量 `FE_GUARD_DEBUG=1`，错误会打到 stderr。
+先确认项目根有对应客户端的配置——`.trae/mcp.json`（Trae）、`.cursor/mcp.json`（Cursor）、`.mcp.json`（Claude Code）、`.vscode/mcp.json`（VS Code，`servers` 下）或 `.gemini/settings.json`（Gemini CLI）——并且里面有 `fe-guard` 条目；然后重载项目。手动验证 server 能否启动：`node ./node_modules/fe-guard/bin/fe-guard-mcp.js`（它会等 stdin 输入，Ctrl+C 退出），或 `npx fe-guard mcp`。排查时加环境变量 `FE_GUARD_DEBUG=1`，错误会打到 stderr。
 
 **MCP 配置加载正常，但面板红错、0 个工具**
 日志里只有「config loaded / server added」却没有连接记录，多半是进程根本没起来：macOS GUI 应用不加载 shell 的 PATH，node 装在 nvm / fnm 下时 `command: "node"` 会 ENOENT。把 `mcp.json` 的 `command` 与 `args` 全改成绝对路径（node 可执行文件 + 脚本 + `--root`），不依赖 PATH 与 cwd。nvm 路径带版本号，切换 node 版本后要同步改。

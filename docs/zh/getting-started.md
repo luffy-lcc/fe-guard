@@ -28,7 +28,7 @@ npx fe-guard init
 | `fe-guard.config.json` | 唯一的配置入口：检查项开关、严重级别、baseline 与报告路径、流程层开关 |
 | `fe-guard.baseline.json` | 历史欠债账本，初始为空 |
 | `AGENTS.md` | 追加一段受管片段（带 `<!-- fe-guard:begin -->` 标记），是跨工具的唯一事实源 |
-| `.trae/mcp.json`、`.cursor/mcp.json` | 把 fe-guard MCP server 挂到两个 IDE（只接管 `mcpServers["fe-guard"]`，不覆盖你已有的 server） |
+| `.trae/mcp.json`、`.cursor/mcp.json`、`.mcp.json`、`.vscode/mcp.json`、`.gemini/settings.json` | 把 fe-guard MCP server 挂到 Trae / Cursor / Claude Code / VS Code / Gemini CLI（每个文件只接管自己的 `fe-guard` 条目，不覆盖已有 server 或其它设置；不碰用户 home） |
 | `.trae/rules/fe-guard.md`、`.cursor/rules/fe-guard.mdc` | 同一份流程说明，按各自格式生成 |
 | `.trae/commands/fe-guard-*.md` | 两个斜杠命令：看下一步、跑门禁 |
 | `.trae/hooks.example.json`、`.cursor/hooks.example.json` | hooks 示例（不会自动生效） |

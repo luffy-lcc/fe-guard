@@ -28,7 +28,7 @@ It generates these files:
 | `fe-guard.config.json` | The single config entry point: check toggles, severity levels, baseline and report paths, workflow-layer toggle |
 | `fe-guard.baseline.json` | The ledger of historical debt, initially empty |
 | `AGENTS.md` | Appends a managed snippet (with `<!-- fe-guard:begin -->` markers), the single source of truth across tools |
-| `.trae/mcp.json`, `.cursor/mcp.json` | Wires the fe-guard MCP server into both IDEs (only takes over `mcpServers["fe-guard"]`, never overwrites your existing servers) |
+| `.trae/mcp.json`, `.cursor/mcp.json`, `.mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json` | Wires the fe-guard MCP server into Trae / Cursor / Claude Code / VS Code / Gemini CLI (each file only takes over its own `fe-guard` entry, never overwrites your servers or other settings; home configs are not touched) |
 | `.trae/rules/fe-guard.md`, `.cursor/rules/fe-guard.mdc` | The same workflow instructions, generated in each IDE's format |
 | `.trae/commands/fe-guard-*.md` | Two slash commands: see the next step, run the gate |
 | `.trae/hooks.example.json`, `.cursor/hooks.example.json` | Hook examples (not activated automatically) |

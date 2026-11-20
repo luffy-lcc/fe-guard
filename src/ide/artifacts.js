@@ -6,6 +6,21 @@ import { UserError } from '../utils.js'
 export const MCP_SERVER_NAME = 'fe-guard'
 
 /**
+ * 支持的项目级 MCP 客户端。只写项目内文件，不碰用户 home；
+ * 各家 schema 的差异只在 serversKey 与条目字段上，合并逻辑共用。
+ * 排除项：Windsurf / Codex CLI（只有用户级配置）、Cline / Roo（扩展 UI）、
+ * Continue（YAML）、Zed（context_servers 结构未确认）、JetBrains（无标准位置）。
+ */
+export const MCP_CLIENTS = [
+  { id: 'trae', file: '.trae/mcp.json', serversKey: 'mcpServers' },
+  { id: 'cursor', file: '.cursor/mcp.json', serversKey: 'mcpServers' },
+  { id: 'claude-code', file: '.mcp.json', serversKey: 'mcpServers' },
+  // VS Code 的 mcp.json 用 servers 键，并要求显式声明 stdio 传输。
+  { id: 'vscode', file: '.vscode/mcp.json', serversKey: 'servers', extra: { type: 'stdio' } },
+  { id: 'gemini-cli', file: '.gemini/settings.json', serversKey: 'mcpServers' },
+]
+
+/**
  * 只计算“要不要写、写成什么”，不落盘；init --dry-run 直接用它做预览。
  * 返回 created / updated / unchanged。
  */
@@ -44,10 +59,11 @@ export function mcpServerEntry(root) {
 }
 
 /**
- * 合并而不是覆盖：用户可能已经挂了别的 MCP server。
- * 只接管 mcpServers["fe-guard"] 这一项。
+ * 合并而不是覆盖：用户可能已经挂了别的 MCP server，或在该文件里写了别的设置。
+ * 只接管 serversKey 下的 "fe-guard" 一项。
  */
-export function planMcpConfig(root, relative, entry = mcpServerEntry(root)) {
+export function planMcpConfig(root, client, entry = mcpServerEntry(root)) {
+  const { file: relative, serversKey, extra = {} } = client
   const file = path.join(root, relative)
   const current = existsSync(file) ? readFileSync(file, 'utf8') : null
   let parsed = {}
@@ -55,12 +71,16 @@ export function planMcpConfig(root, relative, entry = mcpServerEntry(root)) {
     try {
       parsed = JSON.parse(current) ?? {}
     } catch {
-      throw new UserError(`${relative} 不是合法 JSON，无法合并 fe-guard 的 MCP 配置。请先修好它，或手动添加 mcpServers.${MCP_SERVER_NAME}。`)
+      throw new UserError(`${relative} 不是合法 JSON，无法合并 fe-guard 的 MCP 配置。请先修好它，或手动添加 ${serversKey}.${MCP_SERVER_NAME}。`)
     }
+  }
+  const existing = parsed[serversKey] ?? {}
+  if (typeof existing !== 'object' || Array.isArray(existing)) {
+    throw new UserError(`${relative} 里的 ${serversKey} 不是对象，无法安全合并 fe-guard 的 MCP 配置。请先修正该字段。`)
   }
   const next = {
     ...parsed,
-    mcpServers: { ...(parsed.mcpServers ?? {}), [MCP_SERVER_NAME]: entry },
+    [serversKey]: { ...existing, [MCP_SERVER_NAME]: { ...entry, ...extra } },
   }
   return planManagedFile(root, relative, `${JSON.stringify(next, null, 2)}\n`)
 }

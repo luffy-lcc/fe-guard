@@ -69,7 +69,7 @@ a single source of truth; repeating it per release makes it drift.
 ## Install
 
     npm i -D github:luffy-lcc/fe-guard   # or the attached tarball
-    npx fe-guard init                     # writes .trae/mcp.json / .cursor/mcp.json
+    npx fe-guard init                     # writes project-level MCP configs (Trae/Cursor/Claude Code/VS Code/Gemini CLI)
 
 Reload the IDE's MCP panel to get 7 tools (`task_*` + `ui_lookup`).
 Setup details, manual config and macOS PATH notes:

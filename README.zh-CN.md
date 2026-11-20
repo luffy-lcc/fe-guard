@@ -45,7 +45,7 @@ npx fe-guard check --staged --profile fast
 
 ## 在 AI IDE 里使用（MCP）
 
-`npx fe-guard init` 还会把流程层挂进 Trae / Cursor（`.trae/mcp.json`、`.cursor/mcp.json`，只接管自己的 `mcpServers["fe-guard"]` 条目，不覆盖你已有的 server）。任何 MCP 客户端都可以手动挂载这个 stdio server：
+`npx fe-guard init` 会把流程层挂进五个项目级 MCP 配置：Trae（`.trae/mcp.json`）、Cursor（`.cursor/mcp.json`）、Claude Code（`.mcp.json`）、VS Code（`.vscode/mcp.json`，使用 `servers` + `"type": "stdio"`）与 Gemini CLI（`.gemini/settings.json`）。每个文件里只接管自己的 `fe-guard` 条目：其它 server、其它设置键原样保留，且不会碰用户 home。其它 MCP 客户端可以手动挂载这个 stdio server：
 
 ```json
 { "mcpServers": { "fe-guard": { "command": "node", "args": ["./node_modules/fe-guard/bin/fe-guard-mcp.js"] } } }

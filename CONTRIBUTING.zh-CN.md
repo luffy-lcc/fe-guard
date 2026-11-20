@@ -58,7 +58,7 @@ Release 说明要**短**：一段可直接运行的 quick start + 指向 README 
 ## Install
 
     npm i -D github:luffy-lcc/fe-guard   # 或用附件里的 tarball
-    npx fe-guard init                     # 写入 .trae/mcp.json / .cursor/mcp.json
+    npx fe-guard init                     # 写入五个项目级 MCP 配置（Trae / Cursor / Claude Code / VS Code / Gemini CLI）
 
 重载 IDE 的 MCP 面板即可获得 7 个工具（`task_*` + `ui_lookup`）。
 接入细节、手动配置与 macOS 路径问题见

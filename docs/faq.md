@@ -30,7 +30,7 @@ ESLint runs only on changed files, but tsc and dependency-cruiser still need ful
 dependency-cruiser's JSON provides no line numbers, only "who depends on whom". ESLint and tsc violations all have line numbers.
 
 **fe-guard doesn't show up in the Trae / Cursor MCP panel**
-First confirm the project root has `.trae/mcp.json` / `.cursor/mcp.json` containing `mcpServers.fe-guard`, then reload the project. Verify manually that the server starts: `node ./node_modules/fe-guard/bin/fe-guard-mcp.js` (it waits for stdin; Ctrl+C to exit), or `npx fe-guard mcp`. When troubleshooting, set `FE_GUARD_DEBUG=1` — errors go to stderr.
+First confirm the project root has the config for your client — `.trae/mcp.json` (Trae), `.cursor/mcp.json` (Cursor), `.mcp.json` (Claude Code), `.vscode/mcp.json` (VS Code, under `servers`) or `.gemini/settings.json` (Gemini CLI) — containing a `fe-guard` entry, then reload the project. Verify manually that the server starts: `node ./node_modules/fe-guard/bin/fe-guard-mcp.js` (it waits for stdin; Ctrl+C to exit), or `npx fe-guard mcp`. When troubleshooting, set `FE_GUARD_DEBUG=1` — errors go to stderr.
 
 **MCP config loads fine, but the panel shows a red error and 0 tools**
 If the log only shows "config loaded / server added" with no connection record, the process most likely never started: macOS GUI apps don't load the shell's PATH, so when node is installed under nvm / fnm, `command: "node"` fails with ENOENT. Change `command` and `args` in `mcp.json` to absolute paths (node executable + script + `--root`), independent of PATH and cwd. nvm paths contain version numbers — update them when you switch node versions.

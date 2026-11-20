@@ -552,6 +552,16 @@ async function artifactsIdempotent() {
     JSON.stringify(mcpConfig.mcpServers?.['fe-guard']),
   )
   check('Trae 的 MCP 配置同样生成', existsSync(path.join(app, '.trae/mcp.json')))
+  const claudeConfig = readJson(path.join(app, '.mcp.json'))
+  check('Claude Code 的 .mcp.json 生成', Boolean(claudeConfig.mcpServers?.['fe-guard']), JSON.stringify(claudeConfig))
+  const vscodeConfig = readJson(path.join(app, '.vscode/mcp.json'))
+  check(
+    'VS Code 的 .vscode/mcp.json 使用 servers + stdio',
+    vscodeConfig.servers?.['fe-guard']?.type === 'stdio' && vscodeConfig.servers['fe-guard'].command === 'node',
+    JSON.stringify(vscodeConfig),
+  )
+  const geminiConfig = readJson(path.join(app, '.gemini/settings.json'))
+  check('Gemini CLI 的 .gemini/settings.json 生成', Boolean(geminiConfig.mcpServers?.['fe-guard']), JSON.stringify(geminiConfig))
   for (const file of ['.trae/rules/fe-guard.md', '.trae/commands/fe-guard-next.md', '.trae/commands/fe-guard-gate.md', '.cursor/rules/fe-guard.mdc']) {
     check(`生成 ${file}`, existsSync(path.join(app, file)))
   }

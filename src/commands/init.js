@@ -12,7 +12,7 @@ import {
   traeCommandNext,
   traeRule,
 } from '../ide/source.js'
-import { planManagedFile, planMcpConfig, replaceMarkedBlock } from '../ide/artifacts.js'
+import { MCP_CLIENTS, planManagedFile, planMcpConfig, replaceMarkedBlock } from '../ide/artifacts.js'
 import { AGENTS_TOKEN_LIMIT, estimateTokens } from '../ide/tokens.js'
 import { UserError, writeTextFile } from '../utils.js'
 import { emptyBaseline } from '../baseline.js'
@@ -30,7 +30,7 @@ const IDE_FILES = [
   ['.cursor/hooks.example.json', () => hooksExample('cursor')],
 ]
 
-const MCP_FILES = ['.trae/mcp.json', '.cursor/mcp.json']
+const MCP_CLIENT_LABELS = 'Trae / Cursor / Claude Code / VS Code / Gemini CLI'
 
 const FIRST_RUN_NOTES = [
   '',
@@ -46,7 +46,7 @@ const FIRST_RUN_NOTES = [
   '       npx fe-guard baseline',
   '  2. 跑一次检查:',
   '       npx fe-guard check',
-  '  3. 在 Trae / Cursor 里重载 MCP（已写入 .trae/mcp.json 与 .cursor/mcp.json），',
+  '  3. 在你使用的 IDE / CLI 里重载 MCP（已写入项目级配置），',
   '     然后对 AI 说「按 fe-guard 流程开始」即可看到 task_start / task_criteria / ... 工具。',
   '  4. 想退回 v1 纯检查模式：把 fe-guard.config.json 里 workflow.enabled 设为 false。',
 ]
@@ -96,7 +96,7 @@ function collectPlans({ root, force, preset, dryRun }) {
 
   state.tokens = planAgents(root, commit)
   for (const [file, render] of IDE_FILES) commit(planManagedFile(root, file, render()))
-  for (const file of MCP_FILES) commit(planMcpConfig(root, file))
+  for (const client of MCP_CLIENTS) commit(planMcpConfig(root, client))
   return state
 }
 
@@ -129,6 +129,7 @@ function renderOutput(state) {
   section('已是最新', unchanged)
   section('已存在，跳过', skipped)
   lines.push('', `AGENTS.md 受管片段约 ${tokens} token（上限 ${AGENTS_TOKEN_LIMIT}）`)
+  lines.push(`MCP 客户端: ${MCP_CLIENT_LABELS}（只写项目级配置，不碰用户 home）`)
 
   if (configKept && preset) {
     lines.push(`提示: 配置已存在，--preset ${preset} 没有应用；要按预设重写配置请加 --force。`)

@@ -45,7 +45,7 @@ Adopting into a legacy codebase? `npx fe-guard init --preset legacy --dry-run` p
 
 ## Use in AI IDEs (MCP)
 
-`npx fe-guard init` also wires the workflow layer into Trae / Cursor (`.trae/mcp.json`, `.cursor/mcp.json` — it only manages its own `mcpServers["fe-guard"]` entry, never overwrites your existing servers). Any MCP client can mount the stdio server manually:
+`npx fe-guard init` wires the workflow layer into five project-level MCP configs — Trae (`.trae/mcp.json`), Cursor (`.cursor/mcp.json`), Claude Code (`.mcp.json`), VS Code (`.vscode/mcp.json`, `servers` + `"type": "stdio"`) and Gemini CLI (`.gemini/settings.json`). In each file it only manages its own `fe-guard` entry: other servers and other settings keys are preserved, and your home directory is never touched. Any other MCP client can mount the stdio server manually:
 
 ```json
 { "mcpServers": { "fe-guard": { "command": "node", "args": ["./node_modules/fe-guard/bin/fe-guard-mcp.js"] } } }

@@ -40,7 +40,19 @@
 1. `npx fe-guard init` 已写入 `.cursor/mcp.json`，在 Settings → MCP 里确认 `fe-guard` 已启用。
 2. `.cursor/rules/fe-guard.mdc` 已设 `alwaysApply: true`，Cursor 会自动读取。
 
-两个 IDE 用同一个 server、同一份 `AGENTS.md`、同一份任务状态，换工具不用重配。
+## 挂到 Claude Code / VS Code / Gemini CLI
+
+`init` 还会写这几个客户端的项目级配置，只合并自己的 `fe-guard` 条目：
+
+| 客户端 | 文件 | 结构 |
+| --- | --- | --- |
+| Claude Code | `.mcp.json` | `mcpServers.fe-guard` |
+| VS Code（Copilot agent） | `.vscode/mcp.json` | `servers.fe-guard`，带 `"type": "stdio"` |
+| Gemini CLI | `.gemini/settings.json` | `mcpServers.fe-guard`；文件里的其它设置不动 |
+
+重载客户端或重新打开项目即可加载。Windsurf / Cline / Codex CLI 刻意不写：它们只接受用户级配置，而 fe-guard 不碰用户 home。
+
+所有客户端用同一个 server、同一份 `AGENTS.md`、同一份任务状态，换工具不用重配。
 
 ## 装完之后，对话是什么样
 

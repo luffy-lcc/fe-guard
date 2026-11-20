@@ -40,7 +40,19 @@ If fe-guard is not installed locally in the project (e.g. you use this repo's CL
 1. `npx fe-guard init` writes `.cursor/mcp.json`; confirm `fe-guard` is enabled under Settings → MCP.
 2. `.cursor/rules/fe-guard.mdc` is set to `alwaysApply: true`, so Cursor reads it automatically.
 
-Both IDEs use the same server, the same `AGENTS.md`, and the same task state — switching tools needs no reconfiguration.
+## Connecting Claude Code / VS Code / Gemini CLI
+
+`init` also writes these project-level configs, merging only its own `fe-guard` entry:
+
+| Client | File | Shape |
+| --- | --- | --- |
+| Claude Code | `.mcp.json` | `mcpServers.fe-guard` |
+| VS Code (Copilot agent) | `.vscode/mcp.json` | `servers.fe-guard` with `"type": "stdio"` |
+| Gemini CLI | `.gemini/settings.json` | `mcpServers.fe-guard`; the file's other settings are untouched |
+
+Reload the client or reopen the project to pick up the server. Windsurf / Cline / Codex CLI are deliberately not written: they only accept user-level configuration, and fe-guard never touches your home directory.
+
+All clients use the same server, the same `AGENTS.md`, and the same task state — switching tools needs no reconfiguration.
 
 ## What a conversation looks like after setup
 

@@ -29,6 +29,14 @@ All notable changes to this project are documented here. The format is based on
   `--force` on an existing config is ignored with an explicit notice.
 - Regression tests (`test/init-preset.test.js`) cover the four presets, preset ↔ probe
   ordering, unknown presets, and `--dry-run` (nothing on disk, preview shows the content).
+- **Project-level MCP configs for five clients.** `init` now also writes `.mcp.json`
+  (Claude Code), `.vscode/mcp.json` (VS Code: `servers` + `"type": "stdio"`) and
+  `.gemini/settings.json` (Gemini CLI), alongside the existing Trae / Cursor files.
+  Each file merges only its own `fe-guard` entry — other servers and unrelated settings
+  keys are preserved, invalid JSON is rejected instead of overwritten, and user-home
+  configs are never touched. `--dry-run` previews all of them.
+- Regression tests (`test/init-clients.test.js`) and the v2 verification cover the five
+  clients, the VS Code schema difference, merge/idempotency, invalid JSON and `--dry-run`.
 
 ## [0.1.1]
 

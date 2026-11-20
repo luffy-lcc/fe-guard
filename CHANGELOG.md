@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`check --format sarif`** emits SARIF 2.1.0 for GitHub Code Scanning. It contains only
+  new violations plus `not-executed` results (legacy debt stays in the baseline, so the
+  alerts page matches what the gate fails on). Boundaries results are file-level — no line
+  numbers are fabricated. `not-executed` keeps `level: error` and also sets
+  `executionSuccessful: false` with a tool notification. `--json` remains an alias for
+  `--format json`; the report object and `.fe-guard/report.json` are unchanged.
+- Tests (`test/sarif.test.js`) cover the mapping, known filtering, the `not-executed`
+  representation, URI prefix/encoding, a real `tsc` run and argument validation; the v2
+  verification adds a real-ESLint SARIF scenario.
+
 ## [0.2.0]
 
 ### Added

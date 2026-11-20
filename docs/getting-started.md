@@ -284,6 +284,37 @@ npm run verify:local   # inside the fe-guard repo: npm test + all v1/v2/v3/v4 ve
 # inside the target project, CI only needs: npx fe-guard check --full
 ```
 
+### SARIF for GitHub Code Scanning
+
+`check --format sarif` prints SARIF 2.1.0 to stdout, ready to upload:
+
+```yaml
+permissions:
+  contents: read
+  security-events: write   # required by upload-sarif
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - run: npm i -D github:luffy-lcc/fe-guard
+      - id: guard
+        run: npx fe-guard check --full --format sarif > fe-guard.sarif
+        continue-on-error: true          # upload first, fail the job afterwards
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: { sarif_file: fe-guard.sarif }
+      - if: steps.guard.outcome == 'failure'
+        run: exit 1
+```
+
+- **Only new violations and `not-executed` results are emitted.** Existing debt already lives in the baseline; uploading it would flood the alerts page and then make alerts vanish as the baseline tightens. The exit code is still 0/1/2, so CI keeps failing on new violations.
+- **Boundaries results are file-level.** dependency-cruiser has no line numbers, so `region` is omitted — GitHub pins the alert to the file, not a line. Nothing is fabricated.
+- `not-executed` results keep `level: error`, the invocation sets `executionSuccessful: false`, and a tool notification is attached, so a check that never ran can't look like a pass.
+- Requires code scanning to be available for the repository (GitHub Advanced Security for private repos); otherwise just keep `npx fe-guard check --full` as the gate.
+
 ## Intranet distribution: two paths, pick one
 
 This does not depend on whether a private npm registry exists. Both paths deliver the same package; upgrades and rollbacks follow "the version locked in the project".

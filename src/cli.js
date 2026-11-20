@@ -25,14 +25,16 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
         --force       覆盖已存在的配置与 baseline（并重新探测）
 
   fe-guard check [--diff-only | --staged] [--full | --profile <fast|full>]
-                 [--all] [--json] [--config <file>] [--root <dir>]
+                 [--all] [--json | --format <text|json|sarif>] [--config <file>] [--root <dir>]
       运行当前档位的检查，与 baseline 对比
         --diff-only   只检查本次改动（工作区 + 暂存 + 未跟踪）涉及的源文件
         --staged      检查暂存区内容（提交前钩子用；内容类检查读暂存快照）
         --full        本次跑全档（等价于 --profile full）
         --profile     选择内置档位：fast = ESLint/依赖/组件/指标；full = 再加 tsc、边界、大 diff
         --all         连存量违规一起逐条展示（默认只展示新增，存量给一行摘要）
-        --json        只把机器可读的 JSON 报告输出到 stdout（不再打印摘要）
+        --json        等价于 --format json
+        --format      输出格式：text（默认）/ json / sarif；
+                      sarif 只含新增违规与“检查未执行”，供 GitHub Code Scanning 上传
         --config      指定配置文件；也可用环境变量 FE_GUARD_CONFIG
 
   fe-guard doctor [--profile <fast|full>] [--config <file>] [--json] [--root <dir>]
@@ -82,7 +84,7 @@ const COMMANDS = {
   init: { flags: ['--force', '--dry-run', '--root', '-C'], values: ['--preset'], positionals: 0 },
   check: {
     flags: ['--diff-only', '--staged', '--json', '--all', '--full', '--root', '-C'],
-    values: ['--profile', '--config'],
+    values: ['--profile', '--config', '--format'],
     positionals: 0,
   },
   doctor: { flags: ['--json', '--root', '-C'], values: ['--profile', '--config'], positionals: 0 },
@@ -167,6 +169,13 @@ export async function main(argv) {
       if (flags.has('--diff-only') && flags.has('--staged')) {
         throw new UserError('--diff-only 和 --staged 不能同时使用')
       }
+      const format = values.format
+      if (format && !['text', 'json', 'sarif'].includes(format)) {
+        throw new UserError(`--format 只支持 text / json / sarif，收到 "${format}"`)
+      }
+      if (format && flags.has('--json') && format !== 'json') {
+        throw new UserError('--json 等价于 --format json，不能与其它 --format 值同时使用')
+      }
       code = await checkCommand({
         root,
         diffOnly: flags.has('--diff-only'),
@@ -175,6 +184,7 @@ export async function main(argv) {
         all: flags.has('--all'),
         configPath: values.config,
         profile: flags.has('--full') ? 'full' : values.profile,
+        format,
       })
     } else if (command === 'doctor') {
       code = await doctorCommand({

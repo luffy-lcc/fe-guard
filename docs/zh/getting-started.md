@@ -282,6 +282,37 @@ npm run verify:local   # 在 fe-guard 仓库内：npm test + v1/v2/v3/v4 全部�
 # 在目标项目内，CI 只需跑：npx fe-guard check --full
 ```
 
+### SARIF：接 GitHub Code Scanning
+
+`check --format sarif` 把 SARIF 2.1.0 打到 stdout，可直接上传：
+
+```yaml
+permissions:
+  contents: read
+  security-events: write   # upload-sarif 需要
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - run: npm i -D github:luffy-lcc/fe-guard
+      - id: guard
+        run: npx fe-guard check --full --format sarif > fe-guard.sarif
+        continue-on-error: true          # 先上传，再根据结果决定是否失败
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: { sarif_file: fe-guard.sarif }
+      - if: steps.guard.outcome == 'failure'
+        run: exit 1
+```
+
+- **只输出新增违规与 `not-executed`**。存量已在 baseline 里；全量上传会淹没告警页，随后 baseline 收紧又会让告警批量消失。退出码仍是 0/1/2，CI 照样会因新增违规失败。
+- **boundaries 只有文件级结果**。dependency-cruiser 不提供行号，因此省略 `region`——GitHub 把告警挂在文件上，不指向具体行，也不伪造行号。
+- `not-executed` 仍然是 `level: error`，同时 `executionSuccessful: false` 并附带工具通知，未执行的检查不会看起来像通过。
+- 需要仓库可启用 code scanning（私有仓库需要 GitHub Advanced Security）；没有条件就继续用 `npx fe-guard check --full` 当门禁。
+
 ## 内网分发：两条路，任选一条
 
 不依赖是否存在私有 npm registry。两条路产出的都是同一个包，升级/回滚都以“项目里锁定的版本”为准。

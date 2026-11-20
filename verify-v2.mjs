@@ -652,6 +652,48 @@ async function testFileBinding() {
   }
 }
 
+// ------------------------------------------------------------------ 场景 7：SARIF
+
+/** 0.3.x B1：check --format sarif 用真实 ESLint 跑一遍，结构可被 JSON 解析且带行号。 */
+function sarifOutput() {
+  step('场景 7：check --format sarif')
+  const app = makeApp('sarif')
+  writeFileSync(
+    path.join(app, 'src/sarif-sample.ts'),
+    'export function pick(a: string) {\n  const unused = 1\n  return a == "x"\n}\n',
+  )
+  git(app, ['add', '-A'])
+  git(app, ['commit', '-qm', 'sarif sample'])
+  check('init 成功', cli(app, ['init']).code === 0)
+
+  const run = cli(app, ['check', '--profile', 'fast', '--format', 'sarif'])
+  let sarif = null
+  try {
+    sarif = JSON.parse(run.out)
+  } catch {
+    sarif = null
+  }
+  check('stdout 是合法 JSON（可直接上传）', Boolean(sarif), run.out)
+  check(
+    'SARIF 2.1.0 + driver 信息',
+    sarif?.version === '2.1.0' && sarif?.runs?.[0]?.tool?.driver?.name === 'fe-guard',
+    JSON.stringify(sarif?.runs?.[0]?.tool?.driver),
+  )
+  const results = sarif?.runs?.[0]?.results ?? []
+  const located = results.find(
+    (result) =>
+      result.locations?.[0]?.physicalLocation?.artifactLocation?.uri === 'src/sarif-sample.ts' &&
+      result.locations[0].physicalLocation.region?.startLine > 0,
+  )
+  check('真实 ESLint 结果带文件与行号', Boolean(located), JSON.stringify(results))
+  check('退出码仍为 1', run.code === 1, `exit=${run.code}`)
+
+  check('baseline 入账成功', cli(app, ['baseline']).code === 0)
+  const clean = cli(app, ['check', '--profile', 'fast', '--format', 'sarif'])
+  const cleanSarif = JSON.parse(clean.out)
+  check('存量不输出：SARIF 结果为空且退出码 0', clean.code === 0 && cleanSarif.runs[0].results.length === 0, clean.out)
+}
+
 // ------------------------------------------------------------------ 主流程
 
 async function main() {
@@ -677,6 +719,7 @@ async function main() {
     ['关闭流程层', workflowOff],
     ['条件挂测试', testFileBinding],
     ['生成物', artifactsIdempotent],
+    ['SARIF 输出', sarifOutput],
   ]
   for (const [name, run] of scenarios) {
     try {

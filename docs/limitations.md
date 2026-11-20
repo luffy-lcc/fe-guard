@@ -21,6 +21,7 @@
 - **It can't catch "should this be reused".** Two components with different names and differently split props that are nonetheless business duplicates require human judgment. The tool can only turn deterministic signals — "same name", "high overlap", "two libraries for the same capability" — into failures or warnings.
 - **boundaries has been measured on a real Vue repo (Repo A)** (depcruise 18.8.0: 19 cycles, 0 false positives in sampling, <1s); React/TSX repos and monorepo cross-package boundaries are still uncovered. Vue repos require depcruise to resolve `@vue/compiler-sfc`; otherwise the adapter reports `boundaries/not-executed` (no false pass).
 - **`init`'s probing only checks whether prerequisite files exist** (tsconfig, ESLint config, dependency-cruiser config, `.vue` files, workspaces), not whether those configs are valid. An existing config is never re-probed unless you pass `--force` — delete the tsconfig after init and the check stays enabled, failing loudly rather than silently passing.
+- **SARIF carries only new violations and `not-executed` results.** Legacy debt stays in the baseline and is not uploaded, so the Code Scanning alerts page shows the same set the CLI fails on. Boundaries results have no line numbers, so they are file-level alerts.
 
 ## Baseline and execution-mode limits
 

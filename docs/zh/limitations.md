@@ -21,6 +21,7 @@
 - **它抓不到「该不该复用」**。两个组件名字不同、props 拆得不一样，但业务上就是重复的，需要人判断。工具只能把「同名」「高重合」「同能力用了两个库」这些确定性的信号变成失败或告警。
 - **boundaries 已在真实 Vue 仓库（Repo A）实测**（depcruise 18.8.0：19 条循环、抽样 0 误报、<1s）；仍未覆盖 React/TSX 仓库与 monorepo 多包边界。Vue 仓库需 depcruise 能解析 `@vue/compiler-sfc`，否则适配器报 `boundaries/not-executed`（不会假通过）。
 - **`init` 的探测只看前置文件是否存在**（tsconfig、ESLint 配置、dependency-cruiser 配置、`.vue` 文件、workspaces），不判断这些配置本身是否可用。已存在的配置不会被重新探测，除非加 `--force`——init 之后删掉 tsconfig，检查仍保持启用并会明确报错，而不是静默通过。
+- **SARIF 只含新增违规与 `not-executed`**。存量留在 baseline 里、不上传，因此 Code Scanning 告警页展示的就是 CLI 会失败的那一组；boundaries 没有行号，只能是文件级告警。
 
 ## baseline 与执行模式的限制
 

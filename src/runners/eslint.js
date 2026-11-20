@@ -142,6 +142,12 @@ async function runOne({ root, check, dir, pkg, targets, extensions, timings }) {
   try {
     report = JSON.parse(result.stdout)
   } catch {
+    // 整个 package 都被 ignores（或没有匹配的 flat-config 块）时 ESLint 直接退出 2。
+    // 这等价于“该 package 没有可 lint 的范围”，按跳过处理，而不是让整个检查崩掉。
+    if (result.code === 2 && /all of the files matching the glob pattern|All files matched by/i.test(result.stderr ?? '')) {
+      recordPackage(timings, id, pkg, elapsed, 'skipped')
+      return []
+    }
     recordPackage(timings, id, pkg, elapsed, 'failed')
     throw new UserError(
       `ESLint 在 ${pkg.rel || '仓库根'} 的输出不是合法 JSON（退出码 ${result.code}）。\n` +

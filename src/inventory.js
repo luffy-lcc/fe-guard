@@ -130,11 +130,21 @@ export function collectComponents(root, { roots = ['src'], extensions } = {}) {
   })
   const components = []
   for (const file of files) {
+    // Storybook story / 测试文件里的 Default、Primary 是故事或断言，不是业务组件。
+    if (isStoryOrTest(file)) continue
     const text = readFileSync(path.join(root, file), 'utf8')
     const component = extractComponent(text, file)
     if (component) components.push(component)
   }
   return components.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))
+}
+
+/** stories / 测试目录与同名的 *.stories / *.test / *.spec 文件不参与组件清单与重名检测。 */
+export function isStoryOrTest(file) {
+  return (
+    /(^|\/)(__tests__|__mocks__|e2e)\//.test(file) ||
+    /\.(stories|story|test|spec)\.[^/]+$/.test(file)
+  )
 }
 
 export function buildInventory(root, uiConfig) {

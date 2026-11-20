@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Storybook stories and test files are no longer treated as components.** Repeated
+  `Default` story exports produced dozens of phantom `ui/duplicate-name` errors on real
+  React repos (56 in Bulletproof React). `*.stories.*` / `*.story.*` / `*.test.*` /
+  `*.spec.*` and `__tests__` / `__mocks__` / `e2e` directories are excluded from the
+  component inventory.
+- **Subdirectory projects compare the right `package.json`.** New-dependency detection
+  read the git-root manifest, so every app dependency looked unregistered (30 in
+  Bulletproof React). It now uses `git show <base>:./<path>` relative to the analysed
+  project root.
+- **A workspace package fully ignored by ESLint is skipped instead of aborting the gate.**
+  ESLint exits 2 when every file is ignored (common when the root flat config excludes a
+  docs/site package). That package is recorded as `skipped` in timings; a restored real
+  lint range still catches violations.
+- **`pnpm-workspace.yaml` listing `"."` runs the root package once.** The root entry is
+  deduplicated instead of executed twice (ESLint + TypeScript).
+
 ## [0.3.0]
 
 ### Added

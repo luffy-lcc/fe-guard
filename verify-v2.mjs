@@ -759,6 +759,58 @@ function eslintIgnoredFiles() {
   )
 }
 
+// ------------------------------------------------------------------ 场景 9：ESLint 整包被忽略
+
+/** 根配置把整个 package 排除（monorepo 常见）时按跳过处理，且恢复配置后真问题仍被拦截。 */
+function eslintFullyIgnored() {
+  step('场景 9：ESLint 整包被忽略')
+  const app = path.join(WORK, 'eslint-ignored-package')
+  rmSync(app, { recursive: true, force: true })
+  mkdirSync(path.join(app, 'src'), { recursive: true })
+  symlinkSync(path.join(SAMPLE, 'node_modules'), path.join(app, 'node_modules'), 'dir')
+  writeFileSync(path.join(app, 'package.json'), '{"name":"eslint-ignored","private":true}\n')
+  writeFileSync(path.join(app, 'eslint.config.mjs'), "export default [{ ignores: ['src/**'] }]\n")
+  writeFileSync(path.join(app, 'src/a.js'), 'export const a = 1\n')
+  git(app, ['init', '-q'])
+  git(app, ['config', 'user.email', 'verify@fe-guard.local'])
+  git(app, ['config', 'user.name', 'fe-guard verify'])
+  git(app, ['add', '-A'])
+  git(app, ['commit', '-qm', 'ignored package'])
+  check('init 成功', cli(app, ['init']).code === 0)
+
+  const skipped = cli(app, ['check', '--profile', 'fast', '--format', 'json'])
+  const skippedReport = JSON.parse(skipped.out)
+  check(
+    '整包被忽略按跳过处理，不产生违规',
+    skipped.code === 0 && skippedReport.violations.length === 0,
+    `${skipped.code} ${JSON.stringify(skippedReport.violations)}`,
+  )
+  check(
+    '报告把 eslint 记为 skipped',
+    skippedReport.timings.packages.some((pkg) => pkg.check === 'eslint' && pkg.status === 'skipped'),
+    JSON.stringify(skippedReport.timings.packages),
+  )
+  check(
+    '不是 not-executed（跳过 ≠ 检查失败）',
+    skippedReport.violations.every((violation) => !violation.ruleId.endsWith('/not-executed')),
+    JSON.stringify(skippedReport.violations),
+  )
+
+  // 恢复真实 lint 范围：确认跳过逻辑没有把真问题一起吞掉。
+  writeFileSync(
+    path.join(app, 'eslint.config.mjs'),
+    "export default [{ files: ['src/**/*.js'], rules: { 'no-unused-vars': 'error' } }]\n",
+  )
+  writeFileSync(path.join(app, 'src/a.js'), 'const unused = 1\n')
+  const real = cli(app, ['check', '--profile', 'fast', '--format', 'json'])
+  const realReport = JSON.parse(real.out)
+  check(
+    '恢复配置后真实 lint 错误仍被拦截',
+    real.code === 1 && realReport.violations.some((violation) => violation.ruleId === 'eslint/no-unused-vars'),
+    `${real.code} ${JSON.stringify(realReport.violations)}`,
+  )
+}
+
 // ------------------------------------------------------------------ 主流程
 
 async function main() {
@@ -786,6 +838,7 @@ async function main() {
     ['生成物', artifactsIdempotent],
     ['SARIF 输出', sarifOutput],
     ['ESLint ignore', eslintIgnoredFiles],
+    ['ESLint 整包忽略', eslintFullyIgnored],
   ]
   for (const [name, run] of scenarios) {
     try {

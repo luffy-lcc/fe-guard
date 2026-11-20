@@ -178,8 +178,11 @@ function violationLines(report, showKnown) {
 
   const skipped = (report.timings?.packages ?? []).filter((pkg) => pkg.status === 'skipped')
   if (skipped.length > 0) {
-    const names = skipped.map((pkg) => pkg.dir || pkg.package).slice(0, 5).join('、')
-    lines.push(`已跳过 ${skipped.length} 个没有对应配置的 package：${names}${skipped.length > 5 ? ' 等' : ''}`)
+    const names = [...new Set(skipped.map((pkg) => pkg.dir || pkg.package))]
+    const shown = names.slice(0, 5).join('、')
+    lines.push(
+      `已跳过 ${skipped.length} 项检查（没有对应配置，或配置把全部文件忽略）：${shown}${names.length > 5 ? ' 等' : ''}`,
+    )
   }
   const timings = timingLine(report.timings)
   if (timings) lines.push(`耗时: ${timings}`)

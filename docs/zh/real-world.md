@@ -226,9 +226,27 @@ v6.2 之前，这种结构有两个已确认的缺陷：`--staged` 影子目录�
 
 仍然成立的是：没有 CI 时只有本地默认路径，`--no-verify` 仍可绕过。
 
+## React / TSX 实机验证（0.4.x）
+
+克隆两个开源 React 仓库，用真实工具链完整跑过（不 mock）：
+
+| 仓库 | 形态 | 实际运行的检查 | 结果 |
+| --- | --- | --- | --- |
+| alan2207/bulletproof-react（`apps/react-vite`） | React 18 + Vite + TS；app 位于 git 子目录；含 Storybook stories | eslint、tsc、ui、metrics、boundaries（注入 dependency-cruiser 配置 + 故意制造的循环依赖） | 加夹具前 eslint / tsc 干净；boundaries 抓到循环；56 条 `ui/duplicate-name` 假阳性消失 |
+| pmndrs/jotai | pnpm workspace（`packages: [".", "website"]`）；React 库 + TSX 测试；根 flat config 忽略 `website/` | eslint、tsc、ui、metrics；`website` 记为跳过 | 根包只执行一次；剩 1 条真实的 `metrics/file-lines` |
+
+本次验证发现并修复的问题：
+
+1. **Storybook story / 测试文件被当成组件**：`Default` 反复出现导致 56 条重名错误。现在 `*.stories.*`、`*.story.*`、`*.test.*`、`*.spec.*` 以及 `__tests__` / `__mocks__` / `e2e` 目录都不进入组件清单。
+2. **子目录项目比对错了 `package.json`**：新增依赖检测读了 git 根的清单，导致 30 个应用依赖全被当成未登记。现在用 `git show base:./<path>` 按被检查项目根解析。
+3. **整包被 ESLint 排除会让门禁中断**：所有文件都被忽略时 ESLint 退出 2；现在该 package 记为 `skipped`（在耗时里可见），而不是整体失败。恢复真实 lint 范围后仍能抓到违规。
+4. **`pnpm-workspace.yaml` 里的 `"."` 让根包跑两遍**：现在根包去重，只执行一次。
+
+边界：这验证的是四项检查在 React / TSX 上能正确运行，不代表 `ui` 的复用判断在语义上可靠；boundaries 仍需要项目自备 dependency-cruiser 配置。
+
 ## 本次结论的边界
 
-- 只有 3 个仓库，且都是 Vue 后台类项目；不能代表 React、小程序、SSR、组件库等类型。
+- Vue 的结论来自 3 个后台类仓库；React / TSX 后续在 2 个开源仓库（Bulletproof React、Jotai）验证过。小程序、SSR、组件库仍未覆盖。
 - 误报判定是人工抽样，不是全量标注；`metrics` 的“真重复”只代表“确实高度相似”，不代表“业务上应该合并”。
 - 性能数据来自本机单次执行，没有做多轮统计，也没有覆盖 CI 冷启动、缓存命中等场景。
 - 原仓库未被修改；如果真实接入，`init` 会在仓库根生成 `AGENTS.md`、`fe-guard.config.json`、`fe-guard.baseline.json`、`.fe-guard/` 等文件，需要团队评审后再提交。
@@ -237,7 +255,7 @@ v6.2 之前，这种结构有两个已确认的缺陷：`--staged` 影子目录�
 
 基于这次数据，**不建议现在做**：
 
-- 组件清单的提取质量还没在 React / TSX 仓库上验证；本次样本都是 Vue，不能证明通用。
+- 组件清单的提取已在 React / TSX 上验证（stories 与测试文件被排除，不再产生假重名），但这只证明结构化信号可用，仍不能证明“该不该复用”。
 - `task_plan` 是高频工具，把组件摘要塞进去会让每次计划调用多出 200–600 字节，且大多数计划与组件无关。
 - 真实仓库的 ui 误报仍以 warn 为主（170 条），说明“同名/高重合”只是线索，还不足以让流程层自动替人做复用判断。
 

@@ -25,6 +25,8 @@
 - **被 ESLint 配置排除的文件不会被检查，也不产生违规**。改动文件命中 `ignores`（或没有匹配的 flat config 块）时，ESLint 只给提示，fe-guard 会丢弃它——这个文件属于 lint 范围之外，和非源文件扩展名同理。想检查就去掉对应 ignore 规则；fe-guard 不会用 `--no-ignore` 覆盖你的 ESLint 配置。
 - **baseline 趋势只看已提交的历史**。未入库的 baseline、浅克隆、squash 合并都会让趋势截断；它是只读视图，从不影响门禁。放宽次数只算显式 `--widen`（首次入账与重命名迁移不算），指标只统计键数量、不求和——每文件最大值没有有意义的“总量”。
 - **`task events --summary` 是单任务、事件推导的**。只覆盖当前任务文件，拒绝原因最多列 5 条，而且只能报告被记录下来的事实——AI 绕过工具直接改文件时，摘要同样看不出来。
+- **ui 默认排除 story 与测试文件**。`*.stories.*`、`*.story.*`、`*.test.*`、`*.spec.*` 以及 `__tests__` / `__mocks__` / `e2e` 目录不算组件，否则重复的 `Default` story 会淹没重名检查。真实组件请按正常命名放置。
+- **整包被 ESLint 排除时记为跳过，而不是失败**。根 flat config 忽略 workspace 包的全部文件时，ESLint 不 lint 任何文件并退出 2；fe-guard 在耗时里把该包记为 `skipped`。它不是“通过”——需要 lint 就去掉对应的 ignore 规则。
 - **HTML 报告是单次快照，不是趋势**。它逐条列出所有违规（新增 / 存量 / `not-executed`），大仓库会得到较大的文件，也不会自动裁剪；输出位置跟随 `report.path`，`.gitignore` 不会被动——不想提交就自己忽略 `.fe-guard/`。
 
 ## baseline 与执行模式的限制

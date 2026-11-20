@@ -138,8 +138,16 @@ export function planPackages(root, workspace, check) {
   if (check?.workspace === 'root' || !workspace?.isWorkspace) {
     return [{ name: '(root)', dir: root, rel: '' }]
   }
-  const packages = [...workspace.packages]
-  if (existsSync(path.join(root, 'src'))) {
+  // pnpm-workspace 允许把 "." 写进 packages：根包只应执行一次，不能和补进来的根重复。
+  const packages = []
+  const seen = new Set()
+  for (const pkg of workspace.packages) {
+    const rel = pkg.rel === '.' ? '' : pkg.rel
+    if (seen.has(rel)) continue
+    seen.add(rel)
+    packages.push({ ...pkg, rel, dir: rel ? pkg.dir : root })
+  }
+  if (existsSync(path.join(root, 'src')) && !seen.has('')) {
     const rootPkg = readJsonFile(path.join(root, 'package.json'), {})
     packages.unshift({ name: rootPkg.name ?? '(root)', dir: root, rel: '' })
   }

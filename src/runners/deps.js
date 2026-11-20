@@ -208,7 +208,8 @@ async function addedRuntimeDependencies(root, base, manifests) {
   const added = []
   for (const manifest of manifests) {
     const rel = manifest.dir ? `${manifest.dir}/package.json` : 'package.json'
-    const result = await run('git', ['show', `${base}:${rel}`], { cwd: root })
+    // ./ 前缀按 cwd 解析：项目根是 git 根的子目录时，必须读自己这份 package.json。
+    const result = await run('git', ['show', `${base}:./${rel}`], { cwd: root })
     if (result.code !== 0) continue
     let previous
     try {
@@ -230,7 +231,7 @@ async function addedRuntimeDependencies(root, base, manifests) {
  * - package.json 有变更时（或全量模式）：拦截同能力重复依赖、新增依赖未登记用途。
  * 全量模式用 git 对比 diff.base，所以“已提交的历史依赖”不会反复报，只拦新增。
  */
-export async function runCheck({ root, check, changedFiles, config, gitRoot }) {
+export async function runCheck({ root, check, changedFiles, config }) {
   const packageFile = path.join(root, 'package.json')
   if (!existsSync(packageFile)) return []
   const manifests = discoverManifests(root, check.roots)
@@ -277,7 +278,7 @@ export async function runCheck({ root, check, changedFiles, config, gitRoot }) {
       }
     }
 
-    const added = await addedRuntimeDependencies(gitRoot ?? root, config?.diff?.base ?? 'HEAD', manifests)
+    const added = await addedRuntimeDependencies(root, config?.diff?.base ?? 'HEAD', manifests)
     for (const { dep, file } of added) {
       if (check.registry[dep]) continue
       if (capabilityOf(dep, check.capabilities)?.blocked) continue

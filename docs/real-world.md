@@ -226,9 +226,27 @@ Thresholds only affect **new** issues: legacy violations are already in the base
 
 What still holds: without CI there is only the local default path, and `--no-verify` can still bypass it.
 
+## React / TSX verification (0.4.x)
+
+Two open-source React repositories were cloned and checked end-to-end with real tooling (no mocks):
+
+| Repo | Shape | Checks that ran | Notes |
+| --- | --- | --- | --- |
+| alan2207/bulletproof-react (`apps/react-vite`) | React 18 + Vite + TS; the app is a git subdirectory; Storybook stories | eslint, tsc, ui, metrics, boundaries (an injected dependency-cruiser config plus a deliberate cycle fixture) | eslint / tsc clean before the fixtures; boundaries caught the cycle; the 56 phantom `ui/duplicate-name` errors disappeared |
+| pmndrs/jotai | pnpm workspace (`packages: [".", "website"]`); React library with TSX tests; root flat config ignores `website/` | eslint, tsc, ui, metrics; `website` reported as skipped | root package ran once; one real `metrics/file-lines` finding remained |
+
+Findings fixed during this verification:
+
+1. **Storybook stories / tests were treated as components.** Repeated `Default` exports produced 56 duplicate-name errors. `*.stories.*`, `*.story.*`, `*.test.*`, `*.spec.*` and `__tests__` / `__mocks__` / `e2e` directories are now excluded from the component inventory.
+2. **Subdirectory projects compared the wrong `package.json`.** New-dependency detection read the git-root manifest, so all 30 app dependencies looked unregistered. `git show base:./<path>` now resolves relative to the analysed project root.
+3. **A package fully excluded by ESLint aborted the gate.** ESLint exits 2 when every file is ignored; that package is now recorded as `skipped` (visible in timings) instead of failing the whole check. Restoring a real lint range still catches violations.
+4. **`pnpm-workspace.yaml` listing `"."` ran the root package twice.** The root is now deduplicated and executed once.
+
+Scope: this verifies that the four checks run correctly on React / TSX; it does not claim reuse decisions (`ui`) are semantically right, and `boundaries` still needs a dependency-cruiser config.
+
 ## Boundaries of these conclusions
 
-- Only 3 repositories, all Vue admin-style projects; they cannot represent React, mini-programs, SSR, component libraries, etc.
+- The Vue findings come from 3 admin-style repositories; React / TSX was later verified on 2 open-source repos (Bulletproof React, Jotai). Mini-programs, SSR and component libraries are still uncovered.
 - False-positive judgments are manual sampling, not full annotation; "real duplicates" in `metrics` only means "genuinely highly similar", not "should be merged for business reasons".
 - Performance numbers come from single runs on this machine; no multi-round statistics, and no coverage of CI cold starts, cache hits, etc.
 - The original repositories were not modified; in a real adoption, `init` generates `AGENTS.md`, `fe-guard.config.json`, `fe-guard.baseline.json`, `.fe-guard/`, etc. at the repo root — review them as a team before committing.
@@ -237,7 +255,7 @@ What still holds: without CI there is only the local default path, and `--no-ver
 
 Based on this data, **we do not recommend doing it now**:
 
-- Component-inventory extraction quality has not been validated on React / TSX repos; all samples here are Vue, which does not prove generality.
+- Component-inventory extraction has now been verified on React / TSX (stories and tests excluded, no phantom duplicates), but that only proves the structural signal works; it still doesn't prove a "should reuse" decision.
 - `task_plan` is a high-frequency tool; stuffing component summaries into it adds 200–600 bytes to every plan call, and most plans have nothing to do with components.
 - ui false positives in real repos are still mostly warn-level (170 entries), which shows "same name / high overlap" is only a clue — not enough for the workflow layer to make reuse decisions on a human's behalf automatically.
 

@@ -155,7 +155,7 @@ step('1. monorepo：按 package 各自配置执行，缺配置跳过，失败要
   check('报告里记录每个 package 的耗时', eslintPkgs.every((pkg) => Number.isFinite(pkg.ms)), JSON.stringify(eslintPkgs))
   check('stdout 含 workspace 摘要与耗时', /workspace:.*3 个 package/.test(result.out) && /耗时:/.test(result.out), result.out)
   check('存在违规时退出码为 1', result.code === 1, `code=${result.code}\n${result.err}`)
-  check('跳过信息出现在 stdout', /已跳过 1 个.*package/.test(result.out), result.out)
+  check('跳过信息出现在 stdout', /已跳过 1 项检查.*packages\/c/.test(result.out), result.out)
 
   // 有配置但执行失败：必须暴露，不能静默成功。
   const broken = freshDir('monorepo-broken')

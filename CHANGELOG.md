@@ -4,21 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Fixed
-
-- **Files ignored by ESLint no longer produce phantom violations.** ESLint emits a
-  `ruleId: null` warning for explicitly listed files matched by `ignores` (or with no
-  matching flat-config block); the adapter mapped it to `eslint/parse-error` and counted it
-  as a new violation on every `--staged` / `--diff-only` run. Those notices are now
-  dropped — the file is outside the project's lint scope, same as a non-source extension.
-  Real parse errors stay `eslint/parse-error`, unused `eslint-disable` directives become
-  `eslint/unused-disable-directive`, and any other rule-less ESLint message is preserved
-  as `eslint/no-rule` instead of masquerading as a parse error. No `--no-ignore` override
-  is used.
-- Regression tests (`test/eslint-classify.test.js`) plus a real-ESLint verify-v2 scenario
-  (staged + full) cover the classification and prove real lint errors are still caught.
+## [0.3.0]
 
 ### Added
 
@@ -48,6 +34,20 @@ All notable changes to this project are documented here. The format is based on
 - Tests (`test/trend.test.js`, `test/task-summary.test.js`) cover deltas, widen counting,
   `--limit` truncation, no-git / not-tracked degradation, argument conflicts and the
   summary dimensions.
+
+### Fixed
+
+- **Files ignored by ESLint no longer produce phantom violations.** ESLint emits a
+  `ruleId: null` warning for explicitly listed files matched by `ignores` (or with no
+  matching flat-config block); the adapter mapped it to `eslint/parse-error` and counted it
+  as a new violation on every `--staged` / `--diff-only` run. Those notices are now
+  dropped — the file is outside the project's lint scope, same as a non-source extension.
+  Real parse errors stay `eslint/parse-error`, unused `eslint-disable` directives become
+  `eslint/unused-disable-directive`, and any other rule-less ESLint message is preserved
+  as `eslint/no-rule` instead of masquerading as a parse error. No `--no-ignore` override
+  is used.
+- Regression tests (`test/eslint-classify.test.js`) plus a real-ESLint verify-v2 scenario
+  (staged + full) cover the classification and prove real lint errors are still caught.
 
 ## [0.2.0]
 

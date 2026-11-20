@@ -38,6 +38,16 @@ All notable changes to this project are documented here. The format is based on
   the baseline trail and timings.
 - Tests (`test/html.test.js`) cover escaping, zero external references, no-JS readability,
   path derivation and a real `tsc` end-to-end run.
+- **`baseline --trend [--limit <n>]`** reads the committed history of the baseline file and
+  prints per-commit totals, deltas, ratchet-key counts and explicit widens; `--json` returns
+  the series. It writes nothing and adds no second source of truth. Missing git, an untracked
+  baseline or a shallow clone degrade with a clear message instead of failing the gate.
+- **`task events --summary`** aggregates the event stream read-only: counts by type, gate
+  outcomes and modes, worst single-run new-violation count, rejected calls by tool and
+  reason, criteria coverage and delivery state. `--json` exposes the same digest.
+- Tests (`test/trend.test.js`, `test/task-summary.test.js`) cover deltas, widen counting,
+  `--limit` truncation, no-git / not-tracked degradation, argument conflicts and the
+  summary dimensions.
 
 ## [0.2.0]
 

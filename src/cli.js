@@ -40,7 +40,7 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
       一条命令查看：当前档位、每项检查覆盖到哪些 package、哪些被跳过、
       上次耗时、baseline 规模，以及哪些检查是“空的”
 
-  fe-guard baseline [--widen | --show [--by-rule] | --verify [--base <ref>]]
+  fe-guard baseline [--widen | --show [--by-rule] | --verify [--base <ref>] | --trend [--limit <n>]]
                     [--all] [--json] [--config <file>] [--root <dir>]
       默认：把当前违规记录为 baseline（显式接受历史欠债）
         --widen       允许把已有条目的允许条数调大（默认拒绝）
@@ -49,6 +49,8 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
         --verify      对比 merge-base，未在 widenLog 登记的放宽直接失败
         --base <ref>  --verify 的比较基线；默认读 GITHUB_BASE_REF / GITHUB_BASE_SHA 或本地 upstream
         --all         --show 时展开全部文件（默认最多 20 个）
+        --trend       只读 baseline 的 git 历史，展示存量随时间的变化（不写任何文件）
+        --limit <n>   --trend 显示的版本数（默认 20）
 
   fe-guard false-positive --file <文件> --rule <规则> --reason <原因> [--line <行>]
                           [--json] [--config <file>] [--root <dir>]
@@ -57,8 +59,9 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
         --list        列出全部误报记录（含时间与原因）
         --suggest     按“规则 + 命中次数 + 误报率”给出降级/关闭建议（仍需人工决定）
 
-  fe-guard task [status|events|reset] [--json] [--yes] [--root <dir>]
+  fe-guard task [status|events|reset] [--json] [--summary] [--yes] [--root <dir>]
       查看任务、验收条件与门禁证据；events 看事件流；reset 归档并清空任务
+        --summary     events 时输出聚合摘要（事件构成 / 门禁 / 拒绝 / 条件 / 交付）
 
   fe-guard mcp [--root <dir>]
       以 MCP stdio server 方式启动（给 Trae / Cursor 等 IDE 挂载）
@@ -88,8 +91,8 @@ const COMMANDS = {
   },
   doctor: { flags: ['--json', '--root', '-C'], values: ['--profile', '--config'], positionals: 0 },
   baseline: {
-    flags: ['--widen', '--show', '--by-rule', '--verify', '--follow-renames', '--all', '--json', '--root', '-C'],
-    values: ['--base', '--config'],
+    flags: ['--widen', '--show', '--by-rule', '--verify', '--follow-renames', '--all', '--json', '--trend', '--root', '-C'],
+    values: ['--base', '--config', '--limit'],
     positionals: 0,
   },
   'false-positive': {
@@ -97,7 +100,7 @@ const COMMANDS = {
     values: ['--file', '--rule', '--line', '--reason', '--config'],
     positionals: 0,
   },
-  task: { flags: ['--yes', '--json', '--root', '-C'], positionals: 1 },
+  task: { flags: ['--yes', '--json', '--summary', '--root', '-C'], positionals: 1 },
   mcp: { flags: ['--root', '-C'], positionals: 0 },
 }
 
@@ -144,91 +147,8 @@ function parseArgs(argv) {
 
 export async function main(argv) {
   try {
-    const { command, flags, values, positionals } = parseArgs(argv)
-
-    if (command === 'help') {
-      console.log(HELP)
-      return 0
-    }
-    if (command === 'version') {
-      console.log(VERSION)
-      return 0
-    }
-
-    const root = path.resolve(values.root ?? process.cwd())
-    let code = 0
-    if (command === 'init') {
-      code = await initCommand({
-        root,
-        force: flags.has('--force'),
-        preset: values.preset,
-        dryRun: flags.has('--dry-run'),
-      })
-    } else if (command === 'check') {
-      if (flags.has('--diff-only') && flags.has('--staged')) {
-        throw new UserError('--diff-only 和 --staged 不能同时使用')
-      }
-      const format = values.format
-      if (format && !['text', 'json', 'sarif', 'html'].includes(format)) {
-        throw new UserError(`--format 只支持 text / json / sarif / html，收到 "${format}"`)
-      }
-      if (format && flags.has('--json') && format !== 'json') {
-        throw new UserError('--json 等价于 --format json，不能与其它 --format 值同时使用')
-      }
-      code = await checkCommand({
-        root,
-        diffOnly: flags.has('--diff-only'),
-        staged: flags.has('--staged'),
-        json: flags.has('--json'),
-        all: flags.has('--all'),
-        configPath: values.config,
-        profile: flags.has('--full') ? 'full' : values.profile,
-        format,
-      })
-    } else if (command === 'doctor') {
-      code = await doctorCommand({
-        root,
-        configPath: values.config,
-        profile: values.profile,
-        json: flags.has('--json'),
-      })
-    } else if (command === 'baseline') {
-      code = await baselineCommand({
-        root,
-        widen: flags.has('--widen'),
-        show: flags.has('--show'),
-        verify: flags.has('--verify'),
-        all: flags.has('--all'),
-        json: flags.has('--json'),
-        base: values.base,
-        byRule: flags.has('--by-rule'),
-        followRenames: flags.has('--follow-renames'),
-        configPath: values.config,
-      })
-    } else if (command === 'false-positive') {
-      code = await falsePositiveCommand({
-        root,
-        file: values.file,
-        rule: values.rule,
-        line: values.line,
-        reason: values.reason,
-        summary: flags.has('--summary'),
-        list: flags.has('--list'),
-        suggest: flags.has('--suggest'),
-        json: flags.has('--json'),
-        configPath: values.config,
-      })
-    } else if (command === 'task') {
-      code = await taskCommand({
-        root,
-        action: positionals[0] ?? 'status',
-        yes: flags.has('--yes'),
-        json: flags.has('--json'),
-      })
-    } else if (command === 'mcp') {
-      await startMcpServer({ root })
-      code = 0
-    }
+    const parsed = parseArgs(argv)
+    const code = await dispatch(parsed)
     process.exitCode = code
     return code
   } catch (error) {
@@ -240,4 +160,115 @@ export async function main(argv) {
     }
     return 2
   }
+}
+
+async function dispatch({ command, flags, values, positionals }) {
+  if (command === 'help') {
+    console.log(HELP)
+    return 0
+  }
+  if (command === 'version') {
+    console.log(VERSION)
+    return 0
+  }
+
+  const root = path.resolve(values.root ?? process.cwd())
+  if (command === 'init') {
+    return initCommand({
+      root,
+      force: flags.has('--force'),
+      preset: values.preset,
+      dryRun: flags.has('--dry-run'),
+    })
+  }
+  if (command === 'check') return runCheck(flags, values, root)
+  if (command === 'baseline') return runBaseline(flags, values, root)
+  if (command === 'doctor') {
+    return doctorCommand({
+      root,
+      configPath: values.config,
+      profile: values.profile,
+      json: flags.has('--json'),
+    })
+  }
+  if (command === 'false-positive') {
+    return falsePositiveCommand({
+      root,
+      file: values.file,
+      rule: values.rule,
+      line: values.line,
+      reason: values.reason,
+      summary: flags.has('--summary'),
+      list: flags.has('--list'),
+      suggest: flags.has('--suggest'),
+      json: flags.has('--json'),
+      configPath: values.config,
+    })
+  }
+  if (command === 'task') {
+    return taskCommand({
+      root,
+      action: positionals[0] ?? 'status',
+      yes: flags.has('--yes'),
+      json: flags.has('--json'),
+      summary: flags.has('--summary'),
+    })
+  }
+  if (command === 'mcp') {
+    await startMcpServer({ root })
+    return 0
+  }
+  return 0
+}
+
+async function runCheck(flags, values, root) {
+  if (flags.has('--diff-only') && flags.has('--staged')) {
+    throw new UserError('--diff-only 和 --staged 不能同时使用')
+  }
+  const format = values.format
+  if (format && !['text', 'json', 'sarif', 'html'].includes(format)) {
+    throw new UserError(`--format 只支持 text / json / sarif / html，收到 "${format}"`)
+  }
+  if (format && flags.has('--json') && format !== 'json') {
+    throw new UserError('--json 等价于 --format json，不能与其它 --format 值同时使用')
+  }
+  return checkCommand({
+    root,
+    diffOnly: flags.has('--diff-only'),
+    staged: flags.has('--staged'),
+    json: flags.has('--json'),
+    all: flags.has('--all'),
+    configPath: values.config,
+    profile: flags.has('--full') ? 'full' : values.profile,
+    format,
+  })
+}
+
+async function runBaseline(flags, values, root) {
+  if (values.limit !== undefined) {
+    const limit = Number(values.limit)
+    if (!Number.isInteger(limit) || limit < 1) throw new UserError('--limit 需要正整数')
+  }
+  if (flags.has('--trend')) {
+    const exclusive = ['--widen', '--show', '--by-rule', '--verify', '--follow-renames', '--all']
+    if (values.base !== undefined || exclusive.some((flag) => flags.has(flag))) {
+      throw new UserError('--trend 只读 baseline 历史，不能与 --widen / --show / --verify / --follow-renames / --all / --base 同时使用')
+    }
+  } else if (values.limit !== undefined) {
+    throw new UserError('--limit 只用于 baseline --trend')
+  }
+  return baselineCommand({
+    root,
+    widen: flags.has('--widen'),
+    show: flags.has('--show'),
+    verify: flags.has('--verify'),
+    all: flags.has('--all'),
+    json: flags.has('--json'),
+    base: values.base,
+    byRule: flags.has('--by-rule'),
+    followRenames: flags.has('--follow-renames'),
+    configPath: values.config,
+    trend: flags.has('--trend'),
+    limit: values.limit === undefined ? undefined : Number(values.limit),
+  })
 }

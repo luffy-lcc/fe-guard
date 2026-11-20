@@ -337,6 +337,26 @@ The page lists every violation (new, existing, `not-executed`), each check's sta
 (`unavailable` / `skipped` are called out), the baseline tightening/removal trail and per-check
 timings. It is a snapshot of one run — trends come later.
 
+### Baseline trend
+
+`fe-guard baseline --trend [--limit <n>] [--json]` reads the committed history of
+`fe-guard.baseline.json` and prints one row per commit: total accepted violations, the delta,
+the ratchet key count and how many explicit widens happened. It answers "are we actually
+paying down debt?" without storing any second source of truth — nothing is written.
+
+- Only **committed** history counts. If the baseline is not tracked yet, the command says so
+  (and exits 0); commit it so every developer and CI share the same ledger.
+- `--json` returns `{ available, path, truncated, versions, summary, latestWidenLog }`.
+- Widens count only explicit `--widen` events; initial adoption and rename migration are not
+  "widening". `firstSeen` dates drive the "last 30 days" line.
+
+### Task event summary
+
+`fe-guard task events --summary [--json]` aggregates the current task's event stream without
+adding state: event counts by type, gate runs (passed/failed, modes, last result, worst
+single-run new-violation count), rejected tool calls by tool and reason, criteria coverage,
+and whether the task was delivered (and whether that delivery was degraded).
+
 ## Intranet distribution: two paths, pick one
 
 This does not depend on whether a private npm registry exists. Both paths deliver the same package; upgrades and rollbacks follow "the version locked in the project".

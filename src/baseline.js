@@ -29,8 +29,8 @@ export function loadBaseline(file) {
   return parseBaselineRaw(readJsonFile(file, {}))
 }
 
-/** 从磁盘原始形态解析账本；loadBaseline 与重命名迁移补回 HEAD 账本共用。 */
-function parseBaselineRaw(raw) {
+/** 从磁盘原始形态解析账本；loadBaseline、重命名迁移补回与趋势共用。 */
+export function parseBaselineRaw(raw) {
   const version = raw.version ?? BASELINE_VERSION
   if (version > BASELINE_VERSION) {
     throw new UserError(

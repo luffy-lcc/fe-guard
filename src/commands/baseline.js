@@ -14,6 +14,7 @@ import {
   toDiskShape,
 } from '../baseline.js'
 import { renamedFiles } from '../git.js'
+import { collectBaselineTrend, formatTrend } from '../trend.js'
 import { UserError, run, toPosix } from '../utils.js'
 
 /**
@@ -22,9 +23,16 @@ import { UserError, run, toPosix } from '../utils.js'
  * - --show：按文件分组展示每条规则、数量、首次入账日期；
  * - --verify：CI 用，对比 merge-base（--base / GITHUB_BASE_REF），未在 widenLog 里登记的放宽一律失败。
  */
-export async function baselineCommand({ root, widen, show, verify, all, json, base, byRule, followRenames, configPath }) {
+export async function baselineCommand({ root, widen, show, verify, all, json, base, byRule, followRenames, configPath, trend, limit }) {
   const config = loadConfig(root, { configPath })
   const baselinePath = path.join(root, config.baseline.path)
+
+  // 趋势只读 git 历史，不写账本，也不受“检查全局关闭”影响。
+  if (trend) {
+    const data = await collectBaselineTrend({ root, baselinePath, limit })
+    console.log(json ? JSON.stringify(data, null, 2) : formatTrend(data))
+    return 0
+  }
 
   if (show) return showBaseline({ config, baselinePath, all, json, byRule })
 

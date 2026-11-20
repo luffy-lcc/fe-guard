@@ -329,6 +329,18 @@ jobs:
 
 页面列出全部违规（新增 / 存量 / `not-executed`）、每项检查的状态（`unavailable` / `skipped` 会明确标出）、baseline 收紧与移除明细，以及各检查耗时。它是单次运行的快照，趋势留到后续版本。
 
+### baseline 趋势
+
+`fe-guard baseline --trend [--limit <n>] [--json]` 读取已提交的 `fe-guard.baseline.json` 历史，每个提交一行：存量条数、变化量、指标键数量、显式放宽次数。用来回答“欠债到底有没有在还”，且不写任何文件、不产生第二份事实源。
+
+- 只统计**已提交**的历史。baseline 还没入库时会直接说明（退出码 0）；建议入库，让开发者和 CI 共用同一份账本。
+- `--json` 返回 `{ available, path, truncated, versions, summary, latestWidenLog }`。
+- 放宽次数只算显式 `--widen`；首次入账和重命名迁移不算放宽。`firstSeen` 用于“最近 30 天新入账”这一行。
+
+### 任务事件摘要
+
+`fe-guard task events --summary [--json]` 只读聚合当前任务的事件流：按类型计数、门禁次数（通过 / 失败、mode 分布、最近结果、单次新增最大值）、按工具与原因聚合的拒绝、验收条件覆盖情况，以及是否交付（是否 degraded）。
+
 ## 内网分发：两条路，任选一条
 
 不依赖是否存在私有 npm registry。两条路产出的都是同一个包，升级/回滚都以“项目里锁定的版本”为准。

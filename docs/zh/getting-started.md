@@ -297,21 +297,21 @@ npm i -D fe-guard --registry https://npm.internal.example.com
 npx fe-guard --version
 ```
 
-升级：`npm i -D fe-guard@0.1.1`。回滚：`npm i -D fe-guard@0.1.0`。建议在项目里提交 `package-lock.json`，保证每个人装到同一版。
+升级：`npm i -D fe-guard@0.2.0`。回滚：`npm i -D fe-guard@0.1.1`。建议在项目里提交 `package-lock.json`，保证每个人装到同一版。
 
 ### 路线 B：tarball 直接装（没有 registry 也能用）
 
 ```sh
 # 维护者机器上
-npm pack                      # 产出 fe-guard-0.1.1.tgz
+npm pack                      # 产出 fe-guard-0.2.0.tgz
 # 把 tgz 通过内网网盘 / scp / 共享目录发给使用方
 
 # 使用方项目
-npm i -D ./fe-guard-0.1.1.tgz
+npm i -D ./fe-guard-0.2.0.tgz
 npx fe-guard --version
 ```
 
-升级：拿到新 tgz 后 `npm i -D ./fe-guard-0.1.1.tgz`。回滚：`npm i -D ./fe-guard-0.1.0.tgz`（旧 tgz 保留在共享目录即可）。
+升级：拿到新 tgz 后 `npm i -D ./fe-guard-0.2.0.tgz`。回滚：`npm i -D ./fe-guard-0.1.1.tgz`（旧 tgz 保留在共享目录即可）。
 
 `npm pack` 只包含 `bin/`、`src/`、`examples/`、`README.md`、`README.zh-CN.md`、`LICENSE`、`CHANGELOG.md`，不包含测试与验证脚本；`bin` 的执行位由 npm 自动恢复，安装后 `npx fe-guard` 可直接运行。
 

@@ -299,21 +299,21 @@ npm i -D fe-guard --registry https://npm.internal.example.com
 npx fe-guard --version
 ```
 
-Upgrade: `npm i -D fe-guard@0.1.1`. Rollback: `npm i -D fe-guard@0.1.0`. Commit `package-lock.json` in the project so everyone installs the same version.
+Upgrade: `npm i -D fe-guard@0.2.0`. Rollback: `npm i -D fe-guard@0.1.1`. Commit `package-lock.json` in the project so everyone installs the same version.
 
 ### Route B: install the tarball directly (works without a registry)
 
 ```sh
 # on the maintainer's machine
-npm pack                      # produces fe-guard-0.1.1.tgz
+npm pack                      # produces fe-guard-0.2.0.tgz
 # send the tgz to consumers via intranet file share / scp / shared directory
 
 # consuming project
-npm i -D ./fe-guard-0.1.1.tgz
+npm i -D ./fe-guard-0.2.0.tgz
 npx fe-guard --version
 ```
 
-Upgrade: once you have the new tgz, `npm i -D ./fe-guard-0.1.1.tgz`. Rollback: `npm i -D ./fe-guard-0.1.0.tgz` (just keep the old tgz in the shared directory).
+Upgrade: once you have the new tgz, `npm i -D ./fe-guard-0.2.0.tgz`. Rollback: `npm i -D ./fe-guard-0.1.1.tgz` (just keep the old tgz in the shared directory).
 
 `npm pack` includes only `bin/`, `src/`, `examples/`, `README.md`, `README.zh-CN.md`, `LICENSE`, `CHANGELOG.md` — no tests or verification scripts. npm restores the executable bit on `bin` automatically, so `npx fe-guard` runs directly after install.
 

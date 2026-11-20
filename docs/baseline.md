@@ -16,6 +16,8 @@ Three checks wrap external tools; the other four are fe-guard's own lightweight 
 | `metrics` | Built-in (token statistics, no external dependencies) | `metrics/file-lines`, `metrics/function-lines`, `metrics/any`, `metrics/duplication` |
 | `diff-size` | Built-in (`git diff --numstat`) | `diff-size/files`, `diff-size/lines` |
 
+ESLint messages without a rule id are classified rather than lumped into one bucket: files excluded by the project's `ignores` / flat-config `files` patterns produce **no violation** (they are outside the lint scope, like a non-source extension), real parse errors become `eslint/parse-error`, unused `eslint-disable` directives become `eslint/unused-disable-directive`, and any other tool notice is kept as `eslint/no-rule`.
+
 Whatever the tool, everything ends up in the same shape:
 
 ```json

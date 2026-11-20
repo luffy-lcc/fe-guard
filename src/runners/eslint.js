@@ -154,8 +154,11 @@ async function runOne({ root, check, dir, pkg, targets, extensions, timings }) {
   const violations = []
   for (const file of report) {
     for (const message of file.messages ?? []) {
+      const ruleId = classifyMessage(message)
+      // ESLint 对被 ignore 的文件只给提示，不代表有 lint 结果：不产生违规，属于项目配置的排除范围。
+      if (ruleId === null) continue
       violations.push({
-        ruleId: `eslint/${message.ruleId ?? 'parse-error'}`,
+        ruleId,
         file: toRepoPath(root, file.filePath, dir),
         line: message.line ?? null,
         severity: message.severity === 1 ? 'warn' : 'error',
@@ -170,6 +173,22 @@ async function runOne({ root, check, dir, pkg, targets, extensions, timings }) {
 
 function pickFiles(files, extensions) {
   return files.filter((file) => extensions.some((ext) => file.endsWith(ext)))
+}
+
+/**
+ * ESLint 的 ruleId 为空表示"不是某条规则产生的消息"：文件被忽略、真正的解析错误、
+ * 未使用的 eslint-disable 指令，以及其它工具自身提示。不能一律归成 parse-error。
+ * 返回 null 表示这条消息不构成违规（被忽略的文件根本没被检查）。
+ */
+export function classifyMessage(message) {
+  if (message.ruleId) return `eslint/${message.ruleId}`
+  const text = message.message ?? ''
+  // "File ignored because of a matching ignore pattern" / "no matching configuration" 等
+  if (/^File ignored\b/.test(text)) return null
+  if (message.fatal || /^Parsing error\b/.test(text)) return 'eslint/parse-error'
+  if (/^Unused eslint-disable directive\b/.test(text)) return 'eslint/unused-disable-directive'
+  // 未知的 ESLint 自身提示：保留内容，但不冒充 parse-error。
+  return 'eslint/no-rule'
 }
 
 function autoTargets(dir) {

@@ -16,6 +16,8 @@
 | `metrics` | 自带（token 统计，无外部依赖） | `metrics/file-lines`、`metrics/function-lines`、`metrics/any`、`metrics/duplication` |
 | `diff-size` | 自带（`git diff --numstat`） | `diff-size/files`、`diff-size/lines` |
 
+没有 ruleId 的 ESLint 消息会分类处理而不是一律归桶：被项目 `ignores` / flat config `files` 排除的文件**不产生违规**（与“非源文件扩展名”同属检查范围之外），真正的解析错误归 `eslint/parse-error`，未使用的 `eslint-disable` 指令归 `eslint/unused-disable-directive`，其它工具提示保留为 `eslint/no-rule`。
+
 不管哪个工具，最终都变成同一种结构：
 
 ```json

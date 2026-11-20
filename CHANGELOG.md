@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **Files ignored by ESLint no longer produce phantom violations.** ESLint emits a
+  `ruleId: null` warning for explicitly listed files matched by `ignores` (or with no
+  matching flat-config block); the adapter mapped it to `eslint/parse-error` and counted it
+  as a new violation on every `--staged` / `--diff-only` run. Those notices are now
+  dropped — the file is outside the project's lint scope, same as a non-source extension.
+  Real parse errors stay `eslint/parse-error`, unused `eslint-disable` directives become
+  `eslint/unused-disable-directive`, and any other rule-less ESLint message is preserved
+  as `eslint/no-rule` instead of masquerading as a parse error. No `--no-ignore` override
+  is used.
+- Regression tests (`test/eslint-classify.test.js`) plus a real-ESLint verify-v2 scenario
+  (staged + full) cover the classification and prove real lint errors are still caught.
+
 ### Added
 
 - **`check --format sarif`** emits SARIF 2.1.0 for GitHub Code Scanning. It contains only

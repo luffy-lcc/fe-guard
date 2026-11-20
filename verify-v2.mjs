@@ -694,6 +694,71 @@ function sarifOutput() {
   check('存量不输出：SARIF 结果为空且退出码 0', clean.code === 0 && cleanSarif.runs[0].results.length === 0, clean.out)
 }
 
+// ------------------------------------------------------------------ 场景 8：ESLint ignore
+
+/** 被 ESLint ignore 的变更文件不产生违规；真正的 lint 错误仍被拦截（staged + full）。 */
+function eslintIgnoredFiles() {
+  step('场景 8：ESLint ignore 文件')
+  const app = path.join(WORK, 'eslint-ignore')
+  rmSync(app, { recursive: true, force: true })
+  mkdirSync(path.join(app, 'src'), { recursive: true })
+  mkdirSync(path.join(app, 'guard'), { recursive: true })
+  symlinkSync(path.join(SAMPLE, 'node_modules'), path.join(app, 'node_modules'), 'dir')
+  writeFileSync(path.join(app, 'package.json'), '{"name":"eslint-ignore","private":true}\n')
+  writeFileSync(
+    path.join(app, 'eslint.config.mjs'),
+    "export default [{ ignores: ['guard/**'] }, { files: ['src/**/*.js'], rules: { 'no-unused-vars': 'error' } }]\n",
+  )
+  writeFileSync(path.join(app, 'src/real-error.js'), 'export const ok = 1\nconst unused = 1\n')
+  writeFileSync(path.join(app, 'guard/file-guard.js'), 'const ignored = 1\n')
+  git(app, ['init', '-q'])
+  git(app, ['config', 'user.email', 'verify@fe-guard.local'])
+  git(app, ['config', 'user.name', 'fe-guard verify'])
+  git(app, ['add', '-A'])
+  git(app, ['commit', '-qm', 'ignore fixture'])
+  check('init 成功', cli(app, ['init']).code === 0)
+
+  // 同时改动被忽略的文件和真实错误文件，加入暂存。
+  writeFileSync(path.join(app, 'src/real-error.js'), 'export const ok = 2\nconst unused = 2\n')
+  writeFileSync(path.join(app, 'guard/file-guard.js'), 'const ignored = 2\n')
+  git(app, ['add', '-A'])
+
+  const staged = cli(app, ['check', '--staged', '--format', 'json'])
+  const stagedReport = JSON.parse(staged.out)
+  check(
+    '被 ignore 的文件不产生 parse-error',
+    stagedReport.violations.every((violation) => violation.ruleId !== 'eslint/parse-error'),
+    JSON.stringify(stagedReport.violations),
+  )
+  check(
+    '真实 lint 错误仍被拦截',
+    stagedReport.violations.some(
+      (violation) => violation.ruleId === 'eslint/no-unused-vars' && violation.file === 'src/real-error.js',
+    ),
+    JSON.stringify(stagedReport.violations),
+  )
+  check('staged 退出码为 1', staged.code === 1, `exit=${staged.code}`)
+
+  // 修掉真实错误，只留被忽略文件的改动。
+  writeFileSync(path.join(app, 'src/real-error.js'), 'export const ok = 2\n')
+  git(app, ['add', '-A'])
+  const clean = cli(app, ['check', '--staged', '--format', 'json'])
+  const cleanReport = JSON.parse(clean.out)
+  check(
+    '只有被忽略的文件变更时退出码 0 且无违规',
+    clean.code === 0 && cleanReport.violations.length === 0,
+    `${clean.code} ${JSON.stringify(cleanReport.violations)}`,
+  )
+
+  const full = cli(app, ['check', '--profile', 'fast', '--format', 'json'])
+  const fullReport = JSON.parse(full.out)
+  check(
+    'full 档同样不产生 ignore 假违规',
+    fullReport.violations.every((violation) => violation.ruleId !== 'eslint/parse-error'),
+    JSON.stringify(fullReport.violations),
+  )
+}
+
 // ------------------------------------------------------------------ 主流程
 
 async function main() {
@@ -720,6 +785,7 @@ async function main() {
     ['条件挂测试', testFileBinding],
     ['生成物', artifactsIdempotent],
     ['SARIF 输出', sarifOutput],
+    ['ESLint ignore', eslintIgnoredFiles],
   ]
   for (const [name, run] of scenarios) {
     try {

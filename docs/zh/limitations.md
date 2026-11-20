@@ -22,6 +22,7 @@
 - **boundaries 已在真实 Vue 仓库（Repo A）实测**（depcruise 18.8.0：19 条循环、抽样 0 误报、<1s）；仍未覆盖 React/TSX 仓库与 monorepo 多包边界。Vue 仓库需 depcruise 能解析 `@vue/compiler-sfc`，否则适配器报 `boundaries/not-executed`（不会假通过）。
 - **`init` 的探测只看前置文件是否存在**（tsconfig、ESLint 配置、dependency-cruiser 配置、`.vue` 文件、workspaces），不判断这些配置本身是否可用。已存在的配置不会被重新探测，除非加 `--force`——init 之后删掉 tsconfig，检查仍保持启用并会明确报错，而不是静默通过。
 - **SARIF 只含新增违规与 `not-executed`**。存量留在 baseline 里、不上传，因此 Code Scanning 告警页展示的就是 CLI 会失败的那一组；boundaries 没有行号，只能是文件级告警。
+- **被 ESLint 配置排除的文件不会被检查，也不产生违规**。改动文件命中 `ignores`（或没有匹配的 flat config 块）时，ESLint 只给提示，fe-guard 会丢弃它——这个文件属于 lint 范围之外，和非源文件扩展名同理。想检查就去掉对应 ignore 规则；fe-guard 不会用 `--no-ignore` 覆盖你的 ESLint 配置。
 - **HTML 报告是单次快照，不是趋势**。它逐条列出所有违规（新增 / 存量 / `not-executed`），大仓库会得到较大的文件，也不会自动裁剪；输出位置跟随 `report.path`，`.gitignore` 不会被动——不想提交就自己忽略 `.fe-guard/`。
 
 ## baseline 与执行模式的限制

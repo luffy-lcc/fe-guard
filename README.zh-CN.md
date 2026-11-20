@@ -26,7 +26,7 @@ fe-guard 只做一件事：让「**不准更差**」自动执行。存量欠债�
 - **MCP 流程层**：事件溯源，阶段由事件推导，AI 无法自报「通过」；验收条件可挂测试，门禁真跑。
 - **fast / full 两档**：钩子 3 秒内，合并前手动全档。
 - **诚实工程**：检查没真正执行就报 `not-executed`（不可入账），跳过 ≠ 通过，绝不假绿灯。
-- **SARIF 输出**：`check --format sarif` 直接接 GitHub Code Scanning（只含新增违规与 `not-executed`，存量不会淹没告警页）。
+- **可分享的输出**：`check --format sarif` 直接接 GitHub Code Scanning（只含新增违规与 `not-executed`，存量不会淹没告警页）；`check --format html` 生成单文件报告，零外部资源。
 - **一个配置关全局**：关掉或降级都只改配置；流程层一行 `workflow.enabled: false` 退回纯检查。
 
 ## 快速上手

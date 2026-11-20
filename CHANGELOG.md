@@ -17,6 +17,13 @@ All notable changes to this project are documented here. The format is based on
 - Tests (`test/sarif.test.js`) cover the mapping, known filtering, the `not-executed`
   representation, URI prefix/encoding, a real `tsc` run and argument validation; the v2
   verification adds a real-ESLint SARIF scenario.
+- **`check --format html`** writes a single self-contained report next to `report.path`
+  (`.fe-guard/report.html`), prints only its path and keeps the exit code. CSS and the
+  filter script are inlined — no external assets, and the full table renders without
+  JavaScript. It shows every violation (new / known / `not-executed`), each check's status,
+  the baseline trail and timings.
+- Tests (`test/html.test.js`) cover escaping, zero external references, no-JS readability,
+  path derivation and a real `tsc` end-to-end run.
 
 ## [0.2.0]
 

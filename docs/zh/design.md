@@ -53,12 +53,14 @@ fe-guard/
 │   ├── git.js                   变更文件收集
 │   ├── report.js                报告生成与终端输出（默认只逐条展示新增）
 │   ├── sarif.js                 报告 → SARIF 2.1.0（只含新增违规与 not-executed）
+│   ├── html.js                  单文件 HTML 报告（内联 CSS/JS，零外部资源）
+│   ├── version.js               工具版本，SARIF / HTML / --version 共用
 │   ├── commands/                init / check / baseline / feedback / doctor / task
 │   ├── workflow/                state.js（事件流/阶段推导）/ tools.js（7 个 MCP 工具）/ tests.js（条件测试）
 │   ├── mcp/server.js            极简 MCP stdio server（零依赖，换行分隔 JSON-RPC）
 │   ├── ide/                     source.js（产物唯一事实源）/ tokens.js / artifacts.js（受管文件 + 5 个 MCP 客户端配置）
 │   └── runners/                 index.js + eslint / typescript / boundaries / deps / ui / metrics / diff-size
-├── test/                        单测 + v5/v6/v6.1/v6.2/v6.3 端到端 + init 探测 / 预设 / MCP 客户端 / SARIF
+├── test/                        单测 + v5/v6/v6.1/v6.2/v6.3 端到端 + init 探测 / 预设 / MCP 客户端 / SARIF / HTML
 ├── examples/sample-app/         带存量违规的样例工程（真实三件套）
 ├── examples/husky-pre-commit    提交前钩子示例（fast 档）
 ├── verify.sh                    v1 一键真实验证（检查 + 棘轮）
@@ -83,6 +85,6 @@ npm run verify:ts7     # TS 7 冒烟：真实 typescript@7 的诊断仍能解析
 npm run self-check     # 用 fe-guard 的 fast 档检查自己
 ```
 
-所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 102 项、v3 83 项、v4 54 项全部通过；`npm test` 121 项通过（含 v6.1 的 17 项、v6.2 的 5 项、v6.3 的 5 项、init 探测的 5 项、init 预设与 `--dry-run` 的 10 项、多客户端 MCP 的 6 项、SARIF 的 6 项）。
+所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 102 项、v3 83 项、v4 54 项全部通过；`npm test` 127 项通过（含 v6.1 的 17 项、v6.2 的 5 项、v6.3 的 5 项、init 探测的 5 项、init 预设与 `--dry-run` 的 10 项、多客户端 MCP 的 6 项、SARIF 的 6 项、HTML 报告的 6 项）。
 
 任何一个环节不符合预期，脚本会打印期望值、实际值和完整输出，并以退出码 1 结束。贡献指南见 [CONTRIBUTING](../../CONTRIBUTING.md)。

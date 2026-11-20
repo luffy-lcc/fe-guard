@@ -26,7 +26,7 @@ fe-guard does one thing: make "**no worse than before**" automatic. Legacy debt 
 - **MCP workflow layer**: event-sourced, stages derived from events, the AI cannot self-report "passed"; criteria can bind a test that the gate really runs.
 - **fast / full profiles**: hooks under 3 seconds, full profile manually before merge.
 - **Honest engineering**: a check that didn't run reports `not-executed` (non-baselineable); skipped ≠ passed; never a false green.
-- **SARIF output**: `check --format sarif` feeds GitHub Code Scanning (new violations + `not-executed` only, so legacy debt doesn't flood the alerts page).
+- **Shareable output**: `check --format sarif` feeds GitHub Code Scanning (new violations + `not-executed` only, so legacy debt doesn't flood the alerts page); `check --format html` writes a single self-contained report with zero external assets.
 - **One config controls everything**: disable or downgrade by editing config; `workflow.enabled: false` falls back to pure checks.
 
 ## Quick start

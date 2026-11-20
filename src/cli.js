@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { UserError } from './utils.js'
 import { initCommand } from './commands/init.js'
 import { checkCommand } from './commands/check.js'
@@ -9,9 +7,9 @@ import { falsePositiveCommand } from './commands/feedback.js'
 import { doctorCommand } from './commands/doctor.js'
 import { taskCommand } from './commands/task.js'
 import { startMcpServer } from './mcp/server.js'
+import { TOOL_VERSION } from './version.js'
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const VERSION = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version
+const VERSION = TOOL_VERSION
 
 const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多工具归一化 + baseline 棘轮）
 
@@ -25,7 +23,7 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
         --force       覆盖已存在的配置与 baseline（并重新探测）
 
   fe-guard check [--diff-only | --staged] [--full | --profile <fast|full>]
-                 [--all] [--json | --format <text|json|sarif>] [--config <file>] [--root <dir>]
+                 [--all] [--json | --format <text|json|sarif|html>] [--config <file>] [--root <dir>]
       运行当前档位的检查，与 baseline 对比
         --diff-only   只检查本次改动（工作区 + 暂存 + 未跟踪）涉及的源文件
         --staged      检查暂存区内容（提交前钩子用；内容类检查读暂存快照）
@@ -33,8 +31,9 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
         --profile     选择内置档位：fast = ESLint/依赖/组件/指标；full = 再加 tsc、边界、大 diff
         --all         连存量违规一起逐条展示（默认只展示新增，存量给一行摘要）
         --json        等价于 --format json
-        --format      输出格式：text（默认）/ json / sarif；
-                      sarif 只含新增违规与“检查未执行”，供 GitHub Code Scanning 上传
+        --format      输出格式：text（默认）/ json / sarif / html；
+                      sarif 只含新增违规与“检查未执行”，供 GitHub Code Scanning 上传；
+                      html 写到 report.path 同目录的 .html 文件（单文件、零外链），stdout 只打印路径
         --config      指定配置文件；也可用环境变量 FE_GUARD_CONFIG
 
   fe-guard doctor [--profile <fast|full>] [--config <file>] [--json] [--root <dir>]
@@ -170,8 +169,8 @@ export async function main(argv) {
         throw new UserError('--diff-only 和 --staged 不能同时使用')
       }
       const format = values.format
-      if (format && !['text', 'json', 'sarif'].includes(format)) {
-        throw new UserError(`--format 只支持 text / json / sarif，收到 "${format}"`)
+      if (format && !['text', 'json', 'sarif', 'html'].includes(format)) {
+        throw new UserError(`--format 只支持 text / json / sarif / html，收到 "${format}"`)
       }
       if (format && flags.has('--json') && format !== 'json') {
         throw new UserError('--json 等价于 --format json，不能与其它 --format 值同时使用')

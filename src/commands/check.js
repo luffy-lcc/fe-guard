@@ -1,8 +1,10 @@
+import path from 'node:path'
 import { loadConfig } from '../config.js'
 import { runCheckCore } from '../check-core.js'
+import { htmlReportPath, renderHtmlReport } from '../html.js'
 import { printReport } from '../report.js'
 import { buildSarif } from '../sarif.js'
-import { run, toPosix } from '../utils.js'
+import { run, toPosix, writeTextFile } from '../utils.js'
 
 export async function checkCommand({ root, diffOnly, staged, json, all, configPath, profile, format }) {
   const mode = staged ? 'staged' : diffOnly ? 'diff-only' : 'full'
@@ -11,7 +13,11 @@ export async function checkCommand({ root, diffOnly, staged, json, all, configPa
 
   // 机器可读输出时 stdout 只放那一份数据，方便 CI 直接管道给 jq / node / 上传动作。
   const output = format ?? (json ? 'json' : 'text')
-  if (output === 'sarif') {
+  if (output === 'html') {
+    const relative = htmlReportPath(config)
+    writeTextFile(path.join(root, relative), renderHtmlReport(report))
+    console.log(`HTML 报告: ${relative}`)
+  } else if (output === 'sarif') {
     console.log(JSON.stringify(buildSarif(report, { pathPrefix: await gitPrefix(root) }), null, 2))
   } else if (output === 'json') {
     console.log(JSON.stringify(report, null, 2))

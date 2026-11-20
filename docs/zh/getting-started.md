@@ -313,6 +313,22 @@ jobs:
 - `not-executed` 仍然是 `level: error`，同时 `executionSuccessful: false` 并附带工具通知，未执行的检查不会看起来像通过。
 - 需要仓库可启用 code scanning（私有仓库需要 GitHub Advanced Security）；没有条件就继续用 `npx fe-guard check --full` 当门禁。
 
+### 静态 HTML 报告
+
+`check --format html` 在 JSON 报告旁边写一个自包含文件（默认 `.fe-guard/report.html`，跟随 `report.path`），stdout 只打印路径，退出码不变。CSS 与筛选脚本全部内联——无 CDN、字体、图片或跳转链接——离线可打开，也能作为 CI artifact。禁用 JavaScript 时整张表仍然渲染，脚本只负责过滤行。
+
+```yaml
+      - run: npx fe-guard check --full --format html
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fe-guard-report
+          path: .fe-guard/report.html
+```
+
+页面列出全部违规（新增 / 存量 / `not-executed`）、每项检查的状态（`unavailable` / `skipped` 会明确标出）、baseline 收紧与移除明细，以及各检查耗时。它是单次运行的快照，趋势留到后续版本。
+
 ## 内网分发：两条路，任选一条
 
 不依赖是否存在私有 npm registry。两条路产出的都是同一个包，升级/回滚都以“项目里锁定的版本”为准。

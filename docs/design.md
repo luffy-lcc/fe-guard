@@ -53,12 +53,14 @@ fe-guard/
 │   ├── git.js                   changed-file collection
 │   ├── report.js                report generation and terminal output (by default lists only new violations)
 │   ├── sarif.js                 report → SARIF 2.1.0 (new violations + not-executed only)
+│   ├── html.js                  single-file HTML report (inline CSS/JS, zero external assets)
+│   ├── version.js               tool version shared by SARIF / HTML / --version
 │   ├── commands/                init / check / baseline / feedback / doctor / task
 │   ├── workflow/                state.js (event stream / stage derivation) / tools.js (7 MCP tools) / tests.js (criteria tests)
 │   ├── mcp/server.js            minimal MCP stdio server (zero deps, newline-delimited JSON-RPC)
 │   ├── ide/                     source.js (single source of truth for artifacts) / tokens.js / artifacts.js (managed files + 5 MCP client configs)
 │   └── runners/                 index.js + eslint / typescript / boundaries / deps / ui / metrics / diff-size
-├── test/                        unit tests + v5/v6/v6.1/v6.2/v6.3 end-to-end + init detection / presets / MCP clients / SARIF
+├── test/                        unit tests + v5/v6/v6.1/v6.2/v6.3 end-to-end + init detection / presets / MCP clients / SARIF / HTML
 ├── examples/sample-app/         sample project with legacy violations (the real trio of tools)
 ├── examples/husky-pre-commit    pre-commit hook example (fast profile)
 ├── verify.sh                    v1 one-command real verification (checks + ratchet)
@@ -83,6 +85,6 @@ npm run verify:ts7     # TS 7 smoke test: real typescript@7 diagnostics still pa
 npm run self-check     # check fe-guard itself with its fast profile
 ```
 
-No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 102, v3 83, v4 54 — all passing; `npm test` passes 121 (including 17 from v6.1, 5 from v6.2, 5 from v6.3, 5 from init detection, 10 from init presets / `--dry-run`, 6 from multi-client MCP and 6 from SARIF).
+No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 102, v3 83, v4 54 — all passing; `npm test` passes 127 (including 17 from v6.1, 5 from v6.2, 5 from v6.3, 5 from init detection, 10 from init presets / `--dry-run`, 6 from multi-client MCP, 6 from SARIF and 6 from the HTML report).
 
 If any step deviates from expectations, the script prints the expected value, the actual value, and the full output, then exits with code 1. See [CONTRIBUTING](../CONTRIBUTING.md) for the contribution guide.

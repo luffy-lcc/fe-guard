@@ -315,6 +315,28 @@ jobs:
 - `not-executed` results keep `level: error`, the invocation sets `executionSuccessful: false`, and a tool notification is attached, so a check that never ran can't look like a pass.
 - Requires code scanning to be available for the repository (GitHub Advanced Security for private repos); otherwise just keep `npx fe-guard check --full` as the gate.
 
+### Static HTML report
+
+`check --format html` writes a single self-contained file next to the JSON report (default
+`.fe-guard/report.html`, following `report.path`), prints its path, and leaves the exit code
+untouched. CSS and the small filter script are inlined — no CDN, fonts, images or links — so
+it opens offline and works as a CI artifact. With JavaScript disabled the full table is still
+rendered; the script only filters rows.
+
+```yaml
+      - run: npx fe-guard check --full --format html
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fe-guard-report
+          path: .fe-guard/report.html
+```
+
+The page lists every violation (new, existing, `not-executed`), each check's status
+(`unavailable` / `skipped` are called out), the baseline tightening/removal trail and per-check
+timings. It is a snapshot of one run — trends come later.
+
 ## Intranet distribution: two paths, pick one
 
 This does not depend on whether a private npm registry exists. Both paths deliver the same package; upgrades and rollbacks follow "the version locked in the project".

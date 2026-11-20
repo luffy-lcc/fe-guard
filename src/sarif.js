@@ -1,13 +1,8 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { isNotExecutedRule } from './not-executed.js'
 import { CHECK_LABELS } from './runners/index.js'
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+import { TOOL_VERSION } from './version.js'
 
 export const SARIF_SCHEMA = 'https://json.schemastore.org/sarif-2.1.0.json'
-export const TOOL_VERSION = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version
 
 /**
  * 把 check 报告转成 GitHub Code Scanning 能直接消费的 SARIF 2.1.0。

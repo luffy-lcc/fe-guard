@@ -35,6 +35,28 @@ It generates these files:
 
 `init` is safe to re-run: files are only written when content changes, and AGENTS.md only replaces the snippet between the markers — it never appends duplicates.
 
+Before writing the config, `init` probes the project: if there is no `tsconfig.json` (root or any workspace package) it disables `typescript`; without an ESLint config it disables `eslint`; without a `.dependency-cruiser.{cjs,js,json}` it disables `boundaries` and picks the file that does exist. The disabled checks are printed and written as `enabled: false`, so a plain JavaScript project passes its first `check` instead of aborting. Flip a check back on once its prerequisite is in place — an existing config is never re-probed unless you pass `--force`.
+
+### Presets and `--dry-run`
+
+`init --preset <name>` picks a starting point for the generated config. The preset is applied first (it sets the tone: which checks are on, how wide the thresholds are), then the project probe applies on top and only ever disables checks whose prerequisites are missing — it never re-enables a check the preset turned off, nor changes a threshold.
+
+| Preset | What it changes |
+| --- | --- |
+| `js` | Plain JavaScript: disables `typescript` and `ui` |
+| `vue` | Explicitly writes the `vue-tsc` auto-switch (`typescript.vue: "auto"`); the defaults are already Vue-oriented |
+| `legacy` | Looser rot thresholds: 800 lines/file, 150-line functions, 50 `any`, duplication ratio 0.6; large diff 40 files / 1200 lines |
+| `monorepo` | Explicit per-package `workspace: "auto"` plus a 40-file / 1000-line large-diff budget |
+
+`init --dry-run` prints every file it would create or update together with its content, and writes nothing:
+
+```bash
+npx fe-guard init --preset legacy --dry-run   # preview only
+npx fe-guard init --preset legacy             # write it
+```
+
+A `--preset` is ignored when a config already exists (without `--force`), and `init` says so instead of silently changing your settings.
+
 ## 3. Record existing violations into the baseline
 
 ```bash

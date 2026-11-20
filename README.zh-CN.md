@@ -32,7 +32,7 @@ fe-guard 只做一件事：让「**不准更差**」自动执行。存量欠债�
 
 ```bash
 npm i -D fe-guard          # npm 未发布时：npm i -D github:luffy-lcc/fe-guard
-npx fe-guard init          # 生成配置 / 空账本 / AGENTS.md 片段 / IDE 接入产物
+npx fe-guard init          # 先探测项目，再生成配置 / 空账本 / AGENTS.md 片段 / IDE 接入产物
 npx fe-guard baseline      # 把现有违规一次入账（检查立刻变绿）
 npx fe-guard check         # 只拦新增；修掉旧违规自动收紧
 # .husky/pre-commit:
@@ -40,6 +40,8 @@ npx fe-guard check --staged --profile fast
 ```
 
 闭环验证：加一行 `const unused = 1` → `check` 失败 → 删掉 → 通过。
+
+老项目接入？`npx fe-guard init --preset legacy --dry-run` 会先预览一份更宽松的起始配置（阈值与将要写入的文件），不落盘；去掉 `--dry-run` 才会真正写入。预设：`js`、`vue`、`legacy`、`monorepo`，详见[快速上手 → 预设与 --dry-run](docs/zh/getting-started.md#预设与---dry-run)。
 
 ## 在 AI IDE 里使用（MCP）
 

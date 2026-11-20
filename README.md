@@ -32,7 +32,7 @@ fe-guard does one thing: make "**no worse than before**" automatic. Legacy debt 
 
 ```bash
 npm i -D fe-guard          # before npm publish: npm i -D github:luffy-lcc/fe-guard
-npx fe-guard init          # config / empty ledger / AGENTS.md snippet / IDE artifacts
+npx fe-guard init          # probe the project, then write config / ledger / AGENTS.md / IDE artifacts
 npx fe-guard baseline      # record existing violations once (check turns green)
 npx fe-guard check         # blocks only new violations; fixing old ones auto-tightens
 # .husky/pre-commit:
@@ -40,6 +40,8 @@ npx fe-guard check --staged --profile fast
 ```
 
 Close the loop: add `const unused = 1` → `check` fails → remove it → passes.
+
+Adopting into a legacy codebase? `npx fe-guard init --preset legacy --dry-run` previews a looser starting config (thresholds and files) without writing anything; drop `--dry-run` to apply it. Presets: `js`, `vue`, `legacy`, `monorepo` — see [Getting started → Presets](docs/getting-started.md#presets-and---dry-run).
 
 ## Use in AI IDEs (MCP)
 

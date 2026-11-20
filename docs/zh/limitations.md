@@ -20,6 +20,7 @@
 - **diff-size 只看增删行数和文件数**。把一个 500 行文件整体重写、只新增 20 行，它不会报；纯删除也不会报。它拦的是「改动面」而不是「改动风险」，默认阈值 20 文件 / 600 行是经验值，需要按团队评审能力调。
 - **它抓不到「该不该复用」**。两个组件名字不同、props 拆得不一样，但业务上就是重复的，需要人判断。工具只能把「同名」「高重合」「同能力用了两个库」这些确定性的信号变成失败或告警。
 - **boundaries 已在真实 Vue 仓库（Repo A）实测**（depcruise 18.8.0：19 条循环、抽样 0 误报、<1s）；仍未覆盖 React/TSX 仓库与 monorepo 多包边界。Vue 仓库需 depcruise 能解析 `@vue/compiler-sfc`，否则适配器报 `boundaries/not-executed`（不会假通过）。
+- **`init` 的探测只看前置文件是否存在**（tsconfig、ESLint 配置、dependency-cruiser 配置、`.vue` 文件、workspaces），不判断这些配置本身是否可用。已存在的配置不会被重新探测，除非加 `--force`——init 之后删掉 tsconfig，检查仍保持启用并会明确报错，而不是静默通过。
 
 ## baseline 与执行模式的限制
 

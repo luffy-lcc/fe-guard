@@ -16,9 +16,13 @@ const VERSION = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')
 const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多工具归一化 + baseline 棘轮）
 
 用法:
-  fe-guard init [--force] [--root <dir>]
-      生成配置、baseline、AGENTS.md 片段，以及 .trae / .cursor 的规则、命令与 MCP 配置
-        --force       覆盖已存在的配置与 baseline
+  fe-guard init [--preset <js|vue|legacy|monorepo>] [--dry-run] [--force] [--root <dir>]
+      先探测项目（tsconfig / ESLint / depcruise / .vue / workspaces），再按结果生成配置、
+      baseline、AGENTS.md 片段，以及 .trae / .cursor 的规则、命令与 MCP 配置
+        --preset      预设基调：js = 纯 JS（关 tsc/ui）；vue = 显式 vue-tsc 自动切换；
+                      legacy = 放宽指标与大 diff 阈值；monorepo = 按包执行 + 放宽大 diff
+        --dry-run     只打印将要写入的文件与内容，不落盘
+        --force       覆盖已存在的配置与 baseline（并重新探测）
 
   fe-guard check [--diff-only | --staged] [--full | --profile <fast|full>]
                  [--all] [--json] [--config <file>] [--root <dir>]
@@ -75,7 +79,7 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
 `
 
 const COMMANDS = {
-  init: { flags: ['--force', '--root', '-C'], positionals: 0 },
+  init: { flags: ['--force', '--dry-run', '--root', '-C'], values: ['--preset'], positionals: 0 },
   check: {
     flags: ['--diff-only', '--staged', '--json', '--all', '--full', '--root', '-C'],
     values: ['--profile', '--config'],
@@ -153,7 +157,12 @@ export async function main(argv) {
     const root = path.resolve(values.root ?? process.cwd())
     let code = 0
     if (command === 'init') {
-      code = await initCommand({ root, force: flags.has('--force') })
+      code = await initCommand({
+        root,
+        force: flags.has('--force'),
+        preset: values.preset,
+        dryRun: flags.has('--dry-run'),
+      })
     } else if (command === 'check') {
       if (flags.has('--diff-only') && flags.has('--staged')) {
         throw new UserError('--diff-only 和 --staged 不能同时使用')

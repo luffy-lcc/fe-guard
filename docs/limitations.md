@@ -20,6 +20,7 @@
 - **diff-size only looks at added/removed lines and file count.** Rewriting a 500-line file wholesale with only 20 added lines won't be reported; pure deletions won't either. It guards "change surface", not "change risk". The default thresholds of 20 files / 600 lines are empirical — tune them to your team's review capacity.
 - **It can't catch "should this be reused".** Two components with different names and differently split props that are nonetheless business duplicates require human judgment. The tool can only turn deterministic signals — "same name", "high overlap", "two libraries for the same capability" — into failures or warnings.
 - **boundaries has been measured on a real Vue repo (Repo A)** (depcruise 18.8.0: 19 cycles, 0 false positives in sampling, <1s); React/TSX repos and monorepo cross-package boundaries are still uncovered. Vue repos require depcruise to resolve `@vue/compiler-sfc`; otherwise the adapter reports `boundaries/not-executed` (no false pass).
+- **`init`'s probing only checks whether prerequisite files exist** (tsconfig, ESLint config, dependency-cruiser config, `.vue` files, workspaces), not whether those configs are valid. An existing config is never re-probed unless you pass `--force` — delete the tsconfig after init and the check stays enabled, failing loudly rather than silently passing.
 
 ## Baseline and execution-mode limits
 

@@ -35,6 +35,28 @@ npx fe-guard init
 
 `init` 可以重复执行：内容没变就不写文件，AGENTS.md 只替换 marker 之间的片段，不会重复追加。
 
+写配置之前 `init` 会先探测项目：没有 `tsconfig.json`（根目录与 workspace 子包都算）就关闭 `typescript`；没有 ESLint 配置就关闭 `eslint`；没有 `.dependency-cruiser.{cjs,js,json}` 就关闭 `boundaries`，并按实际存在的那个文件写 `args`。被关闭的检查会打印出来并写成 `enabled: false`，因此纯 JS 项目第一次 `check` 就能正常通过，而不是直接中断。前置条件补齐后把开关改回 true 即可；已存在的配置不会被重新探测，除非显式加 `--force`。
+
+### 预设与 `--dry-run`
+
+`init --preset <名称>` 给生成的配置定一个起点。执行顺序是「预设先定基调（开关取舍、阈值宽窄），探测再叠加降级」：探测只关掉缺前置条件的检查，不会把预设关掉的检查重新打开，也不会改动阈值。
+
+| 预设 | 改动 |
+| --- | --- |
+| `js` | 纯 JavaScript：关闭 `typescript` 与 `ui` |
+| `vue` | 显式写出 `vue-tsc` 自动切换（`typescript.vue: "auto"`）；默认值本就面向 Vue |
+| `legacy` | 放宽腐化阈值：单文件 800 行、函数 150 行、`any` 50 个、重复率 0.6；大 diff 40 文件 / 1200 行 |
+| `monorepo` | 显式按 package 执行（`workspace: "auto"`），并把大 diff 预算放宽到 40 文件 / 1000 行 |
+
+`init --dry-run` 会打印每个将要创建或更新的文件及其完整内容，但不写任何文件：
+
+```bash
+npx fe-guard init --preset legacy --dry-run   # 只看预览
+npx fe-guard init --preset legacy             # 真正写入
+```
+
+配置已存在时（未加 `--force`）`--preset` 不会生效，`init` 会明确提示，而不是悄悄改你的设置。
+
 ## 3. 把现有违规记进 baseline
 
 ```bash

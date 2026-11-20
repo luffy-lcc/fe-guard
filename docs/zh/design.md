@@ -39,6 +39,8 @@ fe-guard/
 ├── src/
 │   ├── cli.js                   命令行与帮助
 │   ├── config.js                配置读取、默认值、开关判定、workflow 归一化、七项检查默认值
+│   ├── detect.js                init 的项目探测（tsconfig / ESLint / dependency-cruiser / .vue / workspaces）
+│   ├── presets.js               init 预设（js / vue / legacy / monorepo）：探测之前的基调默认值
 │   ├── profiles.js              内置档位 fast / full
 │   ├── not-executed.js          “检查未执行”违规类型（不可入账）
 │   ├── check-core.js            检查内核：CLI 与 MCP 门禁共用；条数/数值两条轨道分流
@@ -55,7 +57,7 @@ fe-guard/
 │   ├── mcp/server.js            极简 MCP stdio server（零依赖，换行分隔 JSON-RPC）
 │   ├── ide/                     source.js（产物唯一事实源）/ tokens.js / artifacts.js
 │   └── runners/                 index.js + eslint / typescript / boundaries / deps / ui / metrics / diff-size
-├── test/                        单测 + v5/v6/v6.1/v6.2/v6.3 端到端
+├── test/                        单测 + v5/v6/v6.1/v6.2/v6.3 端到端 + init 探测 / 预设
 ├── examples/sample-app/         带存量违规的样例工程（真实三件套）
 ├── examples/husky-pre-commit    提交前钩子示例（fast 档）
 ├── verify.sh                    v1 一键真实验证（检查 + 棘轮）
@@ -70,7 +72,7 @@ fe-guard/
 ## 验证体系
 
 ```bash
-npm test               # 单测 + v5/v6/v6.1/v6.2/v6.3 端到端
+npm test               # 单测 + v5/v6/v6.1/v6.2/v6.3 端到端 + init 探测
 npm run verify:local   # 本地一键：npm test + v1/v2/v3/v4 全部验证 + self-check
 npm run verify         # v1：临时目录复制样例工程，跑完整场景并断言退出码
 npm run verify:v2      # v2：真实 MCP 协议跑完整会话 + 反例 + 生成物
@@ -80,6 +82,6 @@ npm run verify:ts7     # TS 7 冒烟：真实 typescript@7 的诊断仍能解析
 npm run self-check     # 用 fe-guard 的 fast 档检查自己
 ```
 
-所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 92 项、v3 83 项、v4 54 项全部通过；`npm test` 94 项通过（含 v6.1 的 17 项、v6.2 的 5 项、v6.3 的 5 项）。
+所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 92 项、v3 83 项、v4 54 项全部通过；`npm test` 109 项通过（含 v6.1 的 17 项、v6.2 的 5 项、v6.3 的 5 项、init 探测的 5 项、init 预设与 `--dry-run` 的 10 项）。
 
 任何一个环节不符合预期，脚本会打印期望值、实际值和完整输出，并以退出码 1 结束。贡献指南见 [CONTRIBUTING](../../CONTRIBUTING.md)。

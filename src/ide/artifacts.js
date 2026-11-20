@@ -1,20 +1,19 @@
 import path from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { UserError, writeTextFile } from '../utils.js'
+import { UserError } from '../utils.js'
 
 export const MCP_SERVER_NAME = 'fe-guard'
 
 /**
- * 幂等写入：内容相同就不动文件。
- * 返回 created / updated / unchanged，init 据此打印"生成"还是"已是最新"。
+ * 只计算“要不要写、写成什么”，不落盘；init --dry-run 直接用它做预览。
+ * 返回 created / updated / unchanged。
  */
-export function writeManagedFile(root, relative, content) {
+export function planManagedFile(root, relative, content) {
   const file = path.join(root, relative)
   const current = existsSync(file) ? readFileSync(file, 'utf8') : null
-  if (current === content) return { file: relative, status: 'unchanged' }
-  writeTextFile(file, content)
-  return { file: relative, status: current === null ? 'created' : 'updated' }
+  const status = current === content ? 'unchanged' : current === null ? 'created' : 'updated'
+  return { file: relative, status, content }
 }
 
 /** 替换 marker 之间的受管片段；没有 marker 时追加到文件末尾。 */
@@ -48,7 +47,7 @@ export function mcpServerEntry(root) {
  * 合并而不是覆盖：用户可能已经挂了别的 MCP server。
  * 只接管 mcpServers["fe-guard"] 这一项。
  */
-export function mergeMcpConfig(root, relative, entry = mcpServerEntry(root)) {
+export function planMcpConfig(root, relative, entry = mcpServerEntry(root)) {
   const file = path.join(root, relative)
   const current = existsSync(file) ? readFileSync(file, 'utf8') : null
   let parsed = {}
@@ -63,8 +62,5 @@ export function mergeMcpConfig(root, relative, entry = mcpServerEntry(root)) {
     ...parsed,
     mcpServers: { ...(parsed.mcpServers ?? {}), [MCP_SERVER_NAME]: entry },
   }
-  const text = `${JSON.stringify(next, null, 2)}\n`
-  if (current === text) return { file: relative, status: 'unchanged' }
-  writeTextFile(file, text)
-  return { file: relative, status: current === null ? 'created' : 'updated' }
+  return planManagedFile(root, relative, `${JSON.stringify(next, null, 2)}\n`)
 }

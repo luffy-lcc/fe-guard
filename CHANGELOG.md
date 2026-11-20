@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`init` probes the project before writing the config.** Checks whose prerequisites are
+  missing are written as `enabled: false` and printed, instead of aborting the first `check`:
+  no `tsconfig.json` (root or any workspace package) disables `typescript`, no ESLint config
+  disables `eslint`, and no `.dependency-cruiser.{cjs,js,json}` disables `boundaries` while
+  pointing `args` at the file that actually exists. `.vue` files and the detected workspace
+  topology are reported. A plain JavaScript project now passes its first `check`.
+  Existing configs are never re-probed unless `--force` is passed.
+- Regression tests (`test/init-detect.test.js`) cover plain-JS, fully configured, monorepo,
+  `--force`, and Vue projects.
+- **`init --preset js|vue|legacy|monorepo`** sets the starting tone of the generated config
+  before probing runs. `js` disables `typescript`/`ui`; `vue` writes the `vue-tsc` auto-switch
+  explicitly; `legacy` loosens rot thresholds (800 lines/file, 150-line functions, 50 `any`,
+  duplication 0.6) and large-diff budgets (40 files / 1200 lines); `monorepo` writes
+  per-package `workspace: "auto"` and a 40-file / 1000-line budget. A preset never re-enables
+  a check the probe disabled, and the probe never changes a preset threshold.
+- **`init --dry-run`** prints every file it would create or update, with its content, and
+  writes nothing — useful for previewing a preset on an existing repo. Mismatched presets
+  (e.g. `--preset js` on a repo with `.vue` files) are reported, and a `--preset` without
+  `--force` on an existing config is ignored with an explicit notice.
+- Regression tests (`test/init-preset.test.js`) cover the four presets, preset ↔ probe
+  ordering, unknown presets, and `--dry-run` (nothing on disk, preview shows the content).
+
 ## [0.1.1]
 
 ### Fixed

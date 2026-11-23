@@ -27,6 +27,7 @@
 - **`task events --summary` 是单任务、事件推导的**。只覆盖当前任务文件，拒绝原因最多列 5 条，而且只能报告被记录下来的事实——AI 绕过工具直接改文件时，摘要同样看不出来。
 - **ui 默认排除 story 与测试文件**。`*.stories.*`、`*.story.*`、`*.test.*`、`*.spec.*` 以及 `__tests__` / `__mocks__` / `e2e` 目录不算组件，否则重复的 `Default` story 会淹没重名检查。真实组件请按正常命名放置。
 - **整包被 ESLint 排除时记为跳过，而不是失败**。根 flat config 忽略 workspace 包的全部文件时，ESLint 不 lint 任何文件并退出 2；fe-guard 在耗时里把该包记为 `skipped`。它不是“通过”——需要 lint 就去掉对应的 ignore 规则。
+- **monorepo 跨包边界只覆盖相对路径引用**。`checks.boundaries.workspace: "auto"` 会再跑一遍 dependency-cruiser，拦截 workspace 包之间 `../../packages/ui/src/x` 这类引用；通过包名（`@scope/ui`，包括直接进内部目录）、根包代码、以及被你的 depcruise 配置整体排除的包都不在判定范围内。启用仍需要 `.dependency-cruiser.{cjs,js,json}`——`init` 不猜 dependency-cruiser 是否安装。
 - **HTML 报告是单次快照，不是趋势**。它逐条列出所有违规（新增 / 存量 / `not-executed`），大仓库会得到较大的文件，也不会自动裁剪；输出位置跟随 `report.path`，`.gitignore` 不会被动——不想提交就自己忽略 `.fe-guard/`。
 
 ## baseline 与执行模式的限制

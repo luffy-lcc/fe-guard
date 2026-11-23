@@ -46,6 +46,7 @@ fe-guard/
 │   ├── check-core.js            check kernel shared by CLI and MCP gate; routes the count/value tracks
 │   ├── baseline.js              ratchet core: count/value comparison, tightening, disk format (pure functions, unit-tested)
 │   ├── workspace.js             monorepo detection, per-package planning, config and bin resolution
+│   ├── workspace-boundaries.js  monorepo cross-package rules (generated depcruise config + edge filter)
 │   ├── timing.js                per-check and per-package timing
 │   ├── feedback.js              false-positive records: append, read, summarize
 │   ├── metrics.js               rot metrics: line counts, function length, any count, token n-gram duplication rate
@@ -61,13 +62,13 @@ fe-guard/
 │   ├── mcp/server.js            minimal MCP stdio server (zero deps, newline-delimited JSON-RPC)
 │   ├── ide/                     source.js (single source of truth for artifacts) / tokens.js / artifacts.js (managed files + 5 MCP client configs)
 │   └── runners/                 index.js + eslint / typescript / boundaries / deps / ui / metrics / diff-size
-├── test/                        unit tests + v5/v6/v6.1/v6.2/v6.3 end-to-end + init detection / presets / MCP clients / SARIF / HTML / ESLint classification / trend / task summary / React-TSX
+├── test/                        unit tests + v5/v6/v6.1/v6.2/v6.3 end-to-end + init detection / presets / MCP clients / SARIF / HTML / ESLint classification / trend / task summary / React-TSX / workspace boundaries
 ├── examples/sample-app/         sample project with legacy violations (the real trio of tools)
 ├── examples/husky-pre-commit    pre-commit hook example (fast profile)
 ├── verify.sh                    v1 one-command real verification (checks + ratchet)
 ├── verify-v2.mjs                v2 one-command real verification (MCP protocol + counterexamples + artifacts + SARIF + ESLint ignore)
 ├── verify-v3.mjs                v3 one-command real verification (positive/negative cases for the four new checks + incremental adoption + per-check disable)
-├── verify-v4.mjs                v4 one-command real verification (monorepo / vue-tsc / first-run view / baseline / false positives)
+├── verify-v4.mjs                v4 one-command real verification (monorepo / vue-tsc / first-run view / baseline / false positives / cross-package boundaries)
 └── verify-ts7.mjs               TypeScript 7 smoke test (non-Vue: real tsc 7 diagnostics still parse)
 ```
 
@@ -86,6 +87,6 @@ npm run verify:ts7     # TS 7 smoke test: real typescript@7 diagnostics still pa
 npm run self-check     # check fe-guard itself with its fast profile
 ```
 
-No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 113, v3 83, v4 54 — all passing; `npm test` passes 141 (including 17 from v6.1, 5 from v6.2, 5 from v6.3, 5 from init detection, 10 from init presets / `--dry-run`, 6 from multi-client MCP, 6 from SARIF, 6 from the HTML report, 5 from ESLint message classification, 6 from trend / task summary and 3 from React/TSX verification).
+No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 113, v3 83, v4 60 — all passing; `npm test` passes 147 (including 17 from v6.1, 5 from v6.2, 5 from v6.3, 5 from init detection, 10 from init presets / `--dry-run`, 6 from multi-client MCP, 6 from SARIF, 6 from the HTML report, 5 from ESLint message classification, 6 from trend / task summary, 3 from React/TSX verification and 6 from cross-package boundaries).
 
 If any step deviates from expectations, the script prints the expected value, the actual value, and the full output, then exits with code 1. See [CONTRIBUTING](../CONTRIBUTING.md) for the contribution guide.

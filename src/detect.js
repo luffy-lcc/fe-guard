@@ -68,6 +68,8 @@ export function configForProject(root, { preset } = {}) {
     disabled.set('boundaries', '没有找到 .dependency-cruiser.{cjs,js,json}（装了 dependency-cruiser 但没有规则，跑起来也是空的）')
   } else if (config.checks.boundaries.enabled) {
     config.checks.boundaries.args = ['src', '--output-type', 'json', '--config', detection.boundaries.config]
+    // monorepo 默认再跑一遍跨包相对引用检查；旧配置的默认值仍是 off。
+    if (detection.workspace.isWorkspace) config.checks.boundaries.workspace = 'auto'
   }
 
   const notes = [
@@ -85,6 +87,9 @@ export function configForProject(root, { preset } = {}) {
   }
   if (!disabled.has('eslint')) notes.push(`ESLint: 找到 ${detection.eslint.configs.join(', ')}`)
   if (!disabled.has('boundaries')) notes.push(`架构边界: 找到 ${detection.boundaries.config}`)
+  if (!disabled.has('boundaries') && config.checks.boundaries.workspace === 'auto') {
+    notes.push('monorepo 跨包边界: 已启用相对路径跨包检查（checks.boundaries.workspace=auto，不改你的 depcruise 配置）')
+  }
 
   notes.push(
     detection.vue.files > 0

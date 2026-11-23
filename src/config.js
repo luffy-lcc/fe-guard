@@ -84,6 +84,8 @@ export function defaultChecks() {
       level: 'error',
       bin: 'depcruise',
       args: ['src', '--output-type', 'json', '--config', '.dependency-cruiser.cjs'],
+      // off：只跑项目自己的 depcruise 配置；auto：monorepo 下额外检查跨包相对引用。
+      workspace: 'off',
       timeoutMs: 120000,
     },
     deps: {
@@ -250,6 +252,7 @@ function normalizeCheck(key, raw, fallback, level, source) {
       level,
       bin: raw.bin,
       args: raw.args,
+      workspace: normalizeBoundariesWorkspace(raw.workspace, source),
       targets: raw.targets ?? fallback.targets,
       timeoutMs: normalizeTimeout(raw.timeoutMs, fallback.timeoutMs, `checks.boundaries.timeoutMs`, source),
       extensions: raw.extensions,
@@ -359,6 +362,14 @@ function normalizeMode(value, fallback, label, source) {
   const mode = value ?? fallback
   if (!['auto', 'root'].includes(mode)) {
     throw new UserError(`${source} 中 ${label} 只能是 auto 或 root，当前为 "${mode}"`)
+  }
+  return mode
+}
+
+function normalizeBoundariesWorkspace(value, source) {
+  const mode = value ?? 'off'
+  if (!['off', 'auto'].includes(mode)) {
+    throw new UserError(`${source} 中 checks.boundaries.workspace 只能是 off 或 auto，当前为 "${mode}"`)
   }
   return mode
 }

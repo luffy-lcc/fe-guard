@@ -30,7 +30,8 @@
       "enabled": true,
       "level": "error",
       "bin": "depcruise",
-      "args": ["src", "--output-type", "json", "--config", ".dependency-cruiser.cjs"]
+      "args": ["src", "--output-type", "json", "--config", ".dependency-cruiser.cjs"],
+      "workspace": "off"
     },
     "deps": {
       "enabled": true,
@@ -103,6 +104,7 @@
 | `profile` | 默认档位：`full`（默认）或 `fast`。命令行 `--profile` / `--full` 可临时覆盖 |
 | `enabled` | 全局总开关。`false` 时 `check` 直接通过（退出码 0，报告标记 `skipped`），用于紧急止血 |
 | `checks.<name>.enabled` | 单项开关，缺省视为关闭。旧配置里没有 `deps` / `ui` / `metrics` / `diff-size`，升级后它们默认关闭，不会突然全红。`init` 会先探测项目，对缺前置条件的检查直接写 `false`（没有 tsconfig → `typescript`，没有 ESLint 配置 → `eslint`，没有 `.dependency-cruiser.{cjs,js,json}` → `boundaries`）；前置条件补齐后把开关改回即可 |
+| `checks.boundaries.workspace` | `off`（默认）或 `auto`。monorepo 下 `auto` 会再跑一遍 dependency-cruiser，拦截**相对路径跨 package 的引用**（`boundaries/workspace-cross-package`）；你自己的 `.dependency-cruiser.cjs` 不会被改动，包名入口引用放行。`init` 在检测到 workspace + depcruise 配置时写入 `auto` |
 | `checks.<name>.level` | `error` 或 `warn`。`warn` 时该项的新增违规只报告、不阻断 |
 | `checks.<name>.bin` / `args` | 实际执行的命令。默认优先用项目内 `node_modules/.bin` 下的同名命令，找不到才走 PATH（仅外部三项）。`typescript` 的 `bin` **留空**即可自动选择（Vue 项目 → `vue-tsc`，否则 `tsc`）；显式写 `"bin": "tsc"` 会关闭 Vue 自动切换，`.vue` 将不被类型检查 |
 | `checks.eslint.targets` | 全量检查时 ESLint 扫哪些目录。空数组 = 自动：有 `src/` 只扫 `src/`，否则扫仓库根，避免把 `dist/`、`docker/static` 一起 lint |

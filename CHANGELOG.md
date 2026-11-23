@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **monorepo cross-package boundaries (`checks.boundaries.workspace: "auto"`).** A second
+  dependency-cruiser pass scans every workspace package and flags relative imports that
+  cross a package boundary (`boundaries/workspace-cross-package`, file-level like all
+  boundary results). Your own `.dependency-cruiser.cjs` is untouched and package-name entry
+  imports are allowed. `init` writes `auto` when it detects a workspace plus a
+  dependency-cruiser config; existing configs keep the `off` default.
+- Tests (`test/workspace-boundaries.test.js`) cover the edge filter, root-package exclusion,
+  config generation, `init` wiring and invalid values; the v4 verification runs a real
+  dependency-cruiser over a two-package workspace (cross import caught, intra-package and
+  package entry imports allowed).
+
 ### Fixed
 
 - **Storybook stories and test files are no longer treated as components.** Repeated

@@ -30,7 +30,8 @@ Configuration is JSON, not YAML: zero dependencies (no hand-written YAML-subset 
       "enabled": true,
       "level": "error",
       "bin": "depcruise",
-      "args": ["src", "--output-type", "json", "--config", ".dependency-cruiser.cjs"]
+      "args": ["src", "--output-type", "json", "--config", ".dependency-cruiser.cjs"],
+      "workspace": "off"
     },
     "deps": {
       "enabled": true,
@@ -103,6 +104,7 @@ Configuration is JSON, not YAML: zero dependencies (no hand-written YAML-subset 
 | `profile` | Default profile: `full` (default) or `fast`. CLI `--profile` / `--full` overrides it temporarily |
 | `enabled` | Global master switch. When `false`, `check` passes immediately (exit code 0, report marked `skipped`) — an emergency stopgap |
 | `checks.<name>.enabled` | Per-check switch; absent means disabled. Old configs lack `deps` / `ui` / `metrics` / `diff-size`; after upgrading they stay disabled by default, so nothing suddenly turns all red. `init` probes the project first and writes `false` for checks whose prerequisite is missing (no tsconfig → `typescript`, no ESLint config → `eslint`, no `.dependency-cruiser.{cjs,js,json}` → `boundaries`); turn one back on once the prerequisite exists |
+| `checks.boundaries.workspace` | `off` (default) or `auto`. With `auto` in a monorepo, a second dependency-cruiser pass scans every package and flags **relative-path imports that cross a package boundary** (`boundaries/workspace-cross-package`). Your own `.dependency-cruiser.cjs` is untouched; package-entry imports are allowed. `init` writes `auto` when it detects a workspace plus a dependency-cruiser config |
 | `checks.<name>.level` | `error` or `warn`. With `warn`, new violations from this check are reported but do not block |
 | `checks.<name>.bin` / `args` | The command actually executed. By default the same-named command in the project's `node_modules/.bin` is preferred; PATH is the fallback (external three checks only). For `typescript`, **omit `bin`** so the check auto-selects `vue-tsc` for Vue projects and `tsc` otherwise; writing `"bin": "tsc"` explicitly disables the Vue switch and `.vue` files won't be type-checked |
 | `checks.eslint.targets` | Which directories ESLint scans in a full check. Empty array = auto: scan only `src/` if it exists, otherwise the repo root — avoids linting `dist/` or `docker/static` along the way |

@@ -415,6 +415,62 @@ step('6. 误报反馈：可记录、可审计、可汇总，但不吞掉结果')
   check('标记误报后检查结果不被吞掉', checked.code === 0 && report.summary.known === 1, JSON.stringify(report.summary))
 }
 
+// ================================================================ 7. monorepo 跨包边界
+
+step('7. monorepo 跨包边界（不改用户 depcruise 配置）')
+{
+  const app = freshDir('workspace-boundaries')
+  writeJson(path.join(app, 'package.json'), {
+    name: 'boundary-root',
+    private: true,
+    workspaces: ['apps/*', 'packages/*'],
+    devDependencies: { 'dependency-cruiser': '^16.10.4' },
+  })
+  writeText(path.join(app, '.dependency-cruiser.cjs'), 'module.exports = { forbidden: [] }\n')
+  writeJson(path.join(app, 'apps/web/package.json'), { name: 'web', private: true })
+  writeJson(path.join(app, 'packages/ui/package.json'), { name: 'ui', private: true })
+  writeText(path.join(app, 'packages/ui/src/index.ts'), 'export const ui = 1\n')
+  // 跨包相对引用：必须被拦。
+  writeText(
+    path.join(app, 'apps/web/src/cross.ts'),
+    "import { ui } from '../../../packages/ui/src/index'\nexport const value = ui\n",
+  )
+  // 包内相对引用：不能误报。
+  writeText(path.join(app, 'apps/web/src/local.ts'), "import { helper } from './helper'\nexport const value = helper\n")
+  writeText(path.join(app, 'apps/web/src/helper.ts'), 'export const helper = 1\n')
+  symlinkSync(path.join(SAMPLE, 'node_modules'), path.join(app, 'node_modules'), 'dir')
+  initGit(app)
+
+  const init = cli(app, ['init'])
+  check('init 成功', init.code === 0, init.err)
+  const config = readJson(path.join(app, 'fe-guard.config.json'))
+  check(
+    'init 写入 checks.boundaries.workspace=auto',
+    config.checks.boundaries.workspace === 'auto' && config.checks.boundaries.enabled === true,
+    JSON.stringify(config.checks.boundaries),
+  )
+
+  const result = cli(app, ['check', '--profile', 'full', '--format', 'json'])
+  const report = readJson(reportFileOf(app))
+  const cross = report.violations.filter((violation) => violation.ruleId === 'boundaries/workspace-cross-package')
+  check('跨包相对引用被拦截', result.code === 1 && cross.length === 1, JSON.stringify(report.violations))
+  check(
+    '违规指向 apps/web 的源文件',
+    cross.length === 1 && cross[0].file === 'apps/web/src/cross.ts',
+    JSON.stringify(cross),
+  )
+  check(
+    '包内相对引用不误报',
+    report.violations.every((violation) => !/local\.ts|helper\.ts/.test(violation.file)),
+    JSON.stringify(report.violations),
+  )
+  check(
+    '没有把 not-executed 混进结果',
+    report.violations.every((violation) => !violation.ruleId.endsWith('/not-executed')),
+    JSON.stringify(report.violations),
+  )
+}
+
 // ================================================================ 汇总
 
 line('\n== 汇总 ==')

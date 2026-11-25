@@ -23,6 +23,7 @@ fe-guard 只做一件事：让「**不准更差**」自动执行。存量欠债�
 - **零运行时依赖**，Node 18+，ESM，安装体积就是几份源码。
 - **七项检查**：ESLint / TypeScript / 架构边界（编排外部工具）+ 依赖守卫 / 组件清单 / 腐化指标 / 大 diff（自带轻量实现）。
 - **baseline 双轨棘轮**：条数 + 指标最大值，只紧不松，`firstSeen` / `widenLog` 可审计。
+- **monorepo 可按 package 记账**：可选 `baseline.strategy: "package"` 让每个 workspace package 各有一本账（老仓库用 `--migrate-packages` 拆分），root 模式仍是默认。
 - **MCP 流程层**：事件溯源，阶段由事件推导，AI 无法自报「通过」；验收条件可挂测试，门禁真跑。
 - **结构化合同 + 人工决策**：每条条件必须有 `type`（ui / interaction / data / tracking / compat / performance）与 `source`；`assumption` 推断项必须由人 `task confirm`，人也可以 `task defer` 把条件转成上线待办——此时交付标 `degraded`，只报「N 完成 / M 待办」，不说「全部完成」。
 - **证据而不是口头声称**：每次门禁写快照到 `.fe-guard/evidence/<taskId>/<evidenceId>.json`；`verify: manual` 证据记录路径、字节数与 sha256；`completion` 给出 `achieved / total / remaining / deferred`。

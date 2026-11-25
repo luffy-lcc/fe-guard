@@ -118,6 +118,31 @@ Both ledgers share the same ratchet semantics: values can only go down, never up
 
 If you're unsure why an entry is in the ledger, don't edit the JSON directly — inspect it with `baseline --show` / `--by-rule` / `--verify`.
 
+### Per-package ledgers in a monorepo
+
+By default the ledger is one repository-wide file. For a monorepo you can keep one ledger per workspace package, so a cleanup in one app doesn't blur another app's debt:
+
+```json
+{ "baseline": { "strategy": "package", "packageFile": "fe-guard.baseline.json" } }
+```
+
+`baseline.strategy: "package"` requires a detected workspace. Package files go to `<package>/<packageFile>`; the root `package.json`, `scripts/` and repo-level files stay in `baseline.path`.
+
+```bash
+npx fe-guard baseline                               # run once, split by file ownership
+npx fe-guard baseline --migrate-packages --dry-run  # existing root ledger: preview
+npx fe-guard baseline --migrate-packages            # then apply and commit the result
+npx fe-guard baseline --show --package apps/web
+npx fe-guard baseline --verify --package apps/web --base origin/main
+```
+
+Common errors:
+
+- `根账本 ... 里仍有 N 条 package 文件条目` — the root ledger is stale; run `baseline --migrate-packages` before `check`.
+- `账本被删除，历史欠债被静默解冻` — `--verify` found a package ledger that existed in the base; restore it or migrate its entries explicitly instead of deleting the file.
+
+Full behavior and limits: [monorepo: per-package ledgers](baseline.md).
+
 ## 4. Run the checks
 
 ```bash
@@ -391,21 +416,21 @@ npm i -D fe-guard --registry https://npm.internal.example.com
 npx fe-guard --version
 ```
 
-Upgrade: `npm i -D fe-guard@0.4.0`. Rollback: `npm i -D fe-guard@0.3.0`. Commit `package-lock.json` in the project so everyone installs the same version.
+Upgrade: `npm i -D fe-guard@0.5.0`. Rollback: `npm i -D fe-guard@0.4.0`. Commit `package-lock.json` in the project so everyone installs the same version.
 
 ### Route B: install the tarball directly (works without a registry)
 
 ```sh
 # on the maintainer's machine
-npm pack                      # produces fe-guard-0.4.0.tgz
+npm pack                      # produces fe-guard-0.5.0.tgz
 # send the tgz to consumers via intranet file share / scp / shared directory
 
 # consuming project
-npm i -D ./fe-guard-0.4.0.tgz
+npm i -D ./fe-guard-0.5.0.tgz
 npx fe-guard --version
 ```
 
-Upgrade: once you have the new tgz, `npm i -D ./fe-guard-0.4.0.tgz`. Rollback: `npm i -D ./fe-guard-0.3.0.tgz` (just keep the old tgz in the shared directory).
+Upgrade: once you have the new tgz, `npm i -D ./fe-guard-0.5.0.tgz`. Rollback: `npm i -D ./fe-guard-0.4.0.tgz` (just keep the old tgz in the shared directory).
 
 `npm pack` includes only `bin/`, `src/`, `examples/`, `README.md`, `README.zh-CN.md`, `LICENSE`, `CHANGELOG.md` — no tests or verification scripts. npm restores the executable bit on `bin` automatically, so `npx fe-guard` runs directly after install.
 

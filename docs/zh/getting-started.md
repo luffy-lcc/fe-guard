@@ -116,6 +116,31 @@ fe-guard baseline 已更新: fe-guard.baseline.json
 
 不确定某条为什么在账本里时，不要直接改 JSON，用 `baseline --show` / `--by-rule` / `--verify` 查。
 
+### monorepo：按 package 管理存量
+
+默认是全仓库一本账。monorepo 里可以给每个 workspace package 各留一本账，某个 app 的清理不会和另一个 app 的欠债混在一起：
+
+```json
+{ "baseline": { "strategy": "package", "packageFile": "fe-guard.baseline.json" } }
+```
+
+`baseline.strategy: "package"` 要求能识别出 workspace。包内文件写到 `<package>/<packageFile>`；根 `package.json`、`scripts/` 与仓库级文件仍留在 `baseline.path`。
+
+```bash
+npx fe-guard baseline                               # 跑一次，按文件归属拆账
+npx fe-guard baseline --migrate-packages --dry-run  # 已有根账本：先预览
+npx fe-guard baseline --migrate-packages            # 再实际拆分并提交结果
+npx fe-guard baseline --show --package apps/web
+npx fe-guard baseline --verify --package apps/web --base origin/main
+```
+
+常见错误：
+
+- `根账本 ... 里仍有 N 条 package 文件条目` — 根账本还没拆干净；先跑 `baseline --migrate-packages`，再 `check`。
+- `账本被删除，历史欠债被静默解冻` — `--verify` 发现基线里存在的 package 账本被删了；把账本恢复，或显式迁移条目，而不是删文件。
+
+完整行为与限制见 [monorepo：package 级账本](baseline.md)。
+
 ## 4. 跑检查
 
 ```bash
@@ -375,21 +400,21 @@ npm i -D fe-guard --registry https://npm.internal.example.com
 npx fe-guard --version
 ```
 
-升级：`npm i -D fe-guard@0.4.0`。回滚：`npm i -D fe-guard@0.3.0`。建议在项目里提交 `package-lock.json`，保证每个人装到同一版。
+升级：`npm i -D fe-guard@0.5.0`。回滚：`npm i -D fe-guard@0.4.0`。建议在项目里提交 `package-lock.json`，保证每个人装到同一版。
 
 ### 路线 B：tarball 直接装（没有 registry 也能用）
 
 ```sh
 # 维护者机器上
-npm pack                      # 产出 fe-guard-0.4.0.tgz
+npm pack                      # 产出 fe-guard-0.5.0.tgz
 # 把 tgz 通过内网网盘 / scp / 共享目录发给使用方
 
 # 使用方项目
-npm i -D ./fe-guard-0.4.0.tgz
+npm i -D ./fe-guard-0.5.0.tgz
 npx fe-guard --version
 ```
 
-升级：拿到新 tgz 后 `npm i -D ./fe-guard-0.4.0.tgz`。回滚：`npm i -D ./fe-guard-0.3.0.tgz`（旧 tgz 保留在共享目录即可）。
+升级：拿到新 tgz 后 `npm i -D ./fe-guard-0.5.0.tgz`。回滚：`npm i -D ./fe-guard-0.4.0.tgz`（旧 tgz 保留在共享目录即可）。
 
 `npm pack` 只包含 `bin/`、`src/`、`examples/`、`README.md`、`README.zh-CN.md`、`LICENSE`、`CHANGELOG.md`，不包含测试与验证脚本；`bin` 的执行位由 npm 自动恢复，安装后 `npx fe-guard` 可直接运行。
 

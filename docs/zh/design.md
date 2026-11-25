@@ -29,6 +29,14 @@ fe-guard 的想法很朴素：
 - **组件清单不常驻上下文**：清单落盘，AI 用 `ui_lookup` 按需查。常驻 token 换偶尔才用的信息不划算，而且清单会随项目增长、更新即过期。
 - **失败也要留下证据**：即使检查失败，报告、baseline 收紧和门禁证据也照常产出，便于复盘。
 
+## package 级 baseline 设计
+
+- **账本布局是可选项，只做加法。** `baseline.strategy` 默认 `root`（一本账，行为不变）。`"package"` 时根级文件留在 `baseline.path`，每个 workspace package 的文件写到 `<package>/<baseline.packageFile>`。账本键仍是仓库相对路径，所以对比、收紧与 `--verify` 复用 root 模式的同一套内核。
+- **归属是确定的。** 文件属于最长前缀匹配的 package，其余归根包。一个文件只有一个归属，条目不会在两本账里被重复计数；`combineLedgers` 遇到重复 key 直接报错，而不是替用户挑一个。
+- **一次判定，按包写回。** `check` 先把多本账合成一个视图，只判定一次，再把新的 entries / ratchets 按归属拆回去，只写有变化的账本；原本不存在的空账本不创建文件。`baseline` 在存在 blocking 且没有 `--widen` 时，写盘之前就退出，不会留下某个包已放宽、另一个包没写的半成品状态。
+- **迁移保留审计字段。** `--migrate-packages` 保留 `firstSeen`，追加 `initial-adoption`（让全新的 package 账本能通过 `--verify`）以及记录来源与目标的 `migrate-packages` 事件。冲突时退出 2 且不写文件——自动选一个值等于静默抹掉另一边的历史。
+- **根账本 stale 防线。** 根账本里仍有属于 package 的条目时，`check` / `baseline` 在判定前就失败。另一种做法是忽略这些条目，但那会静默解冻欠债；所以这里故意做成硬停，并给出迁移提示。
+
 ## 流程层证据模型
 
 流程层把「做完了」拆成可核对的事实：
@@ -57,6 +65,7 @@ fe-guard/
 │   ├── not-executed.js          “检查未执行”违规类型（不可入账）
 │   ├── check-core.js            检查内核：CLI 与 MCP 门禁共用；条数/数值两条轨道分流
 │   ├── baseline.js              棘轮核心：条数与数值的对比、收紧、磁盘格式（纯函数，有单测）
+│   ├── baseline-packages.js     package 模式账本：布局、归属拆分、迁移计划、根账本 stale 防线
 │   ├── workspace.js             monorepo 识别、按 package 规划、配置与 bin 解析
 │   ├── workspace-boundaries.js  monorepo 跨包边界（生成 depcruise 配置、过滤跨包边）
 │   ├── timing.js                检查项与 package 的分段耗时
@@ -69,7 +78,7 @@ fe-guard/
 │   ├── sarif.js                 报告 → SARIF 2.1.0（只含新增违规与 not-executed）
 │   ├── html.js                  单文件 HTML 报告（内联 CSS/JS，零外部资源）
 │   ├── version.js               工具版本，SARIF / HTML / --version 共用
-│   ├── commands/                init / check / baseline / feedback / doctor / task
+│   ├── commands/                init / check / baseline（+ baseline-shared.js 内核）/ feedback / doctor / task
 │   ├── workflow/                流程核心：state.js（事件/阶段）/ definitions.js（工具 schema）/
 │   │                            criteria.js（type/source/verify）/ evidence.js（快照与指纹）/
 │   │                            gate.js / preflight.js / lessons.js / statistics.js / settings.js /
@@ -102,6 +111,6 @@ npm run verify:ts7     # TS 7 冒烟：真实 typescript@7 的诊断仍能解析
 npm run self-check     # 用 fe-guard 的 fast 档检查自己
 ```
 
-所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 135 项、v3 83 项、v4 60 项全部通过；`npm test` 174 项通过，包含工作流合同（结构化条件、confirm / defer）、手工证据与门禁快照、预检、返工对比、复盘 / distill 与 `task stats`。
+所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 135 项、v3 83 项、v4 69 项全部通过；`npm test` 184 项通过，包含工作流合同（结构化条件、confirm / defer）、手工证据与门禁快照、预检、返工对比、复盘 / distill、`task stats`，以及 package 级 baseline（拆账、迁移、`--show` / `--verify` / `--trend --package`、根账本 stale 防线）。
 
 任何一个环节不符合预期，脚本会打印期望值、实际值和完整输出，并以退出码 1 结束。贡献指南见 [CONTRIBUTING](../../CONTRIBUTING.md)。

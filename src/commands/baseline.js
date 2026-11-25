@@ -1,48 +1,89 @@
 import path from 'node:path'
 import { adapterOfRule, checkEnabled, isBaselineExempt, loadConfig } from '../config.js'
-import { activeChecks, runChecks } from '../runners/index.js'
-import {
-  countByKey,
-  countRatchets,
-  loadBaseline,
-  loadBaselineRaw,
-  migrateRenames,
-  parseKey,
-  restoreRenamedKeys,
-  saveBaseline,
-  today,
-  toDiskShape,
-} from '../baseline.js'
+import { activeChecks } from '../runners/index.js'
+import { loadBaseline, migrateRenames, restoreRenamedKeys, saveBaseline, sameEntries } from '../baseline.js'
 import { renamedFiles } from '../git.js'
 import { collectBaselineTrend, formatTrend } from '../trend.js'
-import { UserError, run, toPosix } from '../utils.js'
+import { UserError, toPosix } from '../utils.js'
+import { detectWorkspace } from '../workspace.js'
+import {
+  applyMigratePackages,
+  assertNoStaleRootEntries,
+  loadLedgerLayout,
+  planMigratePackages,
+  splitByOwner,
+  summarizeBaseline,
+} from '../baseline-packages.js'
+import {
+  collectCurrent,
+  compareWithBase,
+  printCommitAdvice,
+  printUpdateSummary,
+  printVerifyResult,
+  readBaseRaw,
+  reportBlocking,
+  resolveBase,
+  showBaseline as showLedger,
+  loadBaselineView,
+  planUpdate,
+} from './baseline-shared.js'
 
 /**
  * baseline 子命令：
  * - 默认 / --widen：把当前真实违规记录为账本（--widen 才允许放宽已有条目）；
  * - --show：按文件分组展示每条规则、数量、首次入账日期；
- * - --verify：CI 用，对比 merge-base（--base / GITHUB_BASE_REF），未在 widenLog 里登记的放宽一律失败。
+ * - --verify：CI 用，对比 merge-base（--base / GITHUB_BASE_REF），未在 widenLog 里登记的放宽一律失败；
+ * - --trend：只读账本 git 历史；
+ * - --migrate-packages：把根账本拆到各 workspace package。
+ *
+ * package 模式（baseline.strategy="package"）只改变“账本有几本、写到哪里”，
+ * 判定与写回语义和根模式保持一致；具体纯逻辑在 baseline-shared.js。
  */
-export async function baselineCommand({ root, widen, show, verify, all, json, base, byRule, followRenames, configPath, trend, limit }) {
+export async function baselineCommand({
+  root,
+  widen,
+  show,
+  verify,
+  all,
+  json,
+  base,
+  byRule,
+  followRenames,
+  configPath,
+  trend,
+  limit,
+  packageName,
+  migratePackages,
+  dryRun,
+}) {
   const config = loadConfig(root, { configPath })
   const baselinePath = path.join(root, config.baseline.path)
 
-  // 趋势只读 git 历史，不写账本，也不受“检查全局关闭”影响。
-  if (trend) {
-    const data = await collectBaselineTrend({ root, baselinePath, limit })
-    console.log(json ? JSON.stringify(data, null, 2) : formatTrend(data))
-    return 0
-  }
+  if (migratePackages) return migrateBaseline({ root, config, dryRun })
 
-  if (show) return showBaseline({ config, baselinePath, all, json, byRule })
+  // 趋势只读 git 历史，不写账本，也不受“检查全局关闭”影响。
+  if (trend) return trendBaseline({ root, config, baselinePath, json, limit, packageName })
+
+  if (show) return showBaselineCommand({ root, config, baselinePath, all, json, byRule, packageName })
 
   // --verify 只读 baseline 与 git，即使检查被关闭也要能校验“账本有没有被偷偷放宽”。
-  if (verify) return verifyBaseline({ root, baselinePath, json, base })
+  if (verify) return verifyBaseline({ root, config, baselinePath, json, base, packageName })
+
+  if (packageName !== undefined) {
+    throw new UserError('--package 只能与 --show / --verify / --trend 一起使用。')
+  }
 
   if (!config.enabled || activeChecks(config).length === 0) {
     throw new UserError('检查已全局关闭（或没有任何启用的检查项），拒绝在关闭状态下重写 baseline，以免误清历史账本。')
   }
 
+  if (config.baseline.strategy === 'package') {
+    return updatePackages({ root, config, widen, followRenames })
+  }
+  return updateRoot({ root, config, baselinePath, widen, followRenames })
+}
+
+async function updateRoot({ root, config, baselinePath, widen, followRenames }) {
   const previous = loadBaseline(baselinePath)
   let migration = null
   if (followRenames) {
@@ -77,416 +118,322 @@ export async function baselineCommand({ root, widen, show, verify, all, json, ba
   return 0
 }
 
-async function collectCurrent({ root, config }) {
-  const violations = await runChecks({ root, config, changedFiles: null, mode: 'full' })
-  const countable = violations.filter(
-    (violation) => typeof violation.value !== 'number' && !isBaselineExempt(violation.ruleId),
-  )
-  const measurable = violations.filter((violation) => typeof violation.value === 'number')
-  return { current: countByKey(countable), currentRatchets: countRatchets(measurable) }
-}
-
-function planUpdate({ previous, enabled, current, currentRatchets, widen }) {
-  const enabledEntries = filterKeys(previous.entries, enabled)
-  const enabledRatchets = filterKeys(previous.ratchets, enabled)
-  const countWidened = widerCounts(current, enabledEntries)
-  const ratchetWidened = widerRatchets(currentRatchets, enabledRatchets)
-  const widened = [...countWidened, ...ratchetWidened]
-  // 两条轨道分别判断“首次入账”：老项目第一次接入 metrics 时不该被条数轨道的历史挡住。
-  const firstEntries = Object.keys(enabledEntries).length === 0
-  const firstRatchets = Object.keys(enabledRatchets).length === 0
-  const blocking = [...(firstEntries ? [] : countWidened), ...(firstRatchets ? [] : ratchetWidened)]
-
-  const nextEntries = { ...filterKeys(previous.entries, (ruleId) => !enabled(ruleId)), ...current }
-  const nextRatchets = { ...filterKeys(previous.ratchets, (ruleId) => !enabled(ruleId)), ...currentRatchets }
-  const firstSeen = {}
-  for (const key of Object.keys(nextEntries).concat(Object.keys(nextRatchets))) {
-    firstSeen[key] = previous.firstSeen[key] ?? today()
-  }
-
-  // 条数首次入账不应把指标轨道的后续放宽也标成 initial-adoption。
-  const initialEntries = firstEntries ? countWidened : []
-  const initialRatchets = firstRatchets ? ratchetWidened : []
-  const explicitWiden = widened.filter((item) => (item.kind === 'entry' ? !firstEntries : !firstRatchets))
-  const widenLog = buildWidenLog({ previous, widen, initialEntries, initialRatchets, explicitWiden })
-  return { blocking, nextEntries, nextRatchets, firstSeen, widenLog, widened, initialEntries, initialRatchets, explicitWiden }
-}
-
-function buildWidenLog({ previous, widen, initialEntries, initialRatchets, explicitWiden }) {
-  const widenLog = [...previous.widenLog]
-  if (initialEntries.length > 0 || initialRatchets.length > 0) {
-    widenLog.push({
-      at: new Date().toISOString(),
-      type: 'initial-adoption',
-      entries: initialEntries.length,
-      ratchets: initialRatchets.length,
-    })
-  }
-  if (widen && explicitWiden.length > 0) {
-    widenLog.push({
-      at: new Date().toISOString(),
-      type: 'widen',
-      items: explicitWiden.map((item) => ({
-        file: item.file,
-        ruleId: item.ruleId,
-        kind: item.kind,
-        from: item.from,
-        to: item.to,
-      })),
-    })
-  }
-  return widenLog
-}
-
-function reportBlocking(blocking) {
-  console.error('fe-guard baseline 被拒绝：以下条目会让 baseline 变宽（历史欠债增加）。')
-  blocking.forEach((item) => console.error(`  ${item.file}  ${item.ruleId}  ${item.from} -> ${item.to}`))
-  console.error('')
-  console.error('如果这些是本次有意接受的欠债，请加 --widen 重跑，并在提交说明里写清原因。')
-  return 2
-}
-
-function printUpdateSummary({ config, previous, plan, current, currentRatchets }) {
-  const { nextEntries, nextRatchets, widened, initialEntries, initialRatchets, explicitWiden } = plan
-  const added = Object.keys(nextEntries).filter((key) => previous.entries[key] === undefined)
-  const addedRatchets = Object.keys(nextRatchets).filter((key) => previous.ratchets[key] === undefined)
-  const tightened = Object.entries(nextEntries).filter(([key, count]) => (previous.entries[key] ?? 0) > count)
-  const tightenedRatchets = Object.entries(nextRatchets).filter(([key, value]) => (previous.ratchets[key] ?? 0) > value)
-  const removed =
-    Object.keys(previous.entries).filter((key) => nextEntries[key] === undefined).length +
-    Object.keys(previous.ratchets).filter((key) => nextRatchets[key] === undefined).length
-
-  const total = Object.values(current).reduce((sum, count) => sum + count, 0)
-  const lines = [
-    `fe-guard baseline 已更新: ${config.baseline.path}`,
-    `  当前条数型违规: ${total}，涉及 ${Object.keys(toDiskShape(current)).length} 个文件`,
-    `  当前指标型条目: ${Object.keys(currentRatchets).length}`,
-    `  新增条目: ${added.length + addedRatchets.length}，收紧: ${tightened.length + tightenedRatchets.length}，删除: ${removed}`,
-  ]
-  if (widened.length > 0) {
-    const initialCount = initialEntries.length + initialRatchets.length
-    if (initialCount > 0) lines.push(`  首次记录存量: ${initialCount}`)
-    if (explicitWiden.length > 0) lines.push(`  显式放宽（--widen）: ${explicitWiden.length}`)
-    widened.slice(0, 20).forEach((item) => lines.push(`    ${item.file}  ${item.ruleId}  ${item.from} -> ${item.to}`))
-    if (widened.length > 20) lines.push(`    ...还有 ${widened.length - 20} 项，用 baseline --show 按文件查看`)
-  }
-  lines.push('')
-  lines.push('提交建议: baseline 变更单独提交，并在说明里写清“首次入账”或“为什么接受这批新欠债”。')
-  console.log(lines.join('\n'))
-}
-
-function showBaseline({ config, baselinePath, all, json, byRule }) {
-  const raw = loadBaselineRaw(baselinePath)
-  const baseline = loadBaseline(baselinePath)
-  if (byRule) return showByRule({ config, raw, baseline, json })
-
-  const files = new Map()
-  for (const [key, count] of Object.entries(baseline.entries)) {
-    const { file, ruleId } = parseKey(key)
-    if (!files.has(file)) files.set(file, [])
-    files.get(file).push({ ruleId, value: count, kind: 'entry', since: baseline.firstSeen[key] ?? null })
-  }
-  for (const [key, value] of Object.entries(baseline.ratchets)) {
-    const { file, ruleId } = parseKey(key)
-    if (!files.has(file)) files.set(file, [])
-    files.get(file).push({ ruleId, value, kind: 'ratchet', since: baseline.firstSeen[key] ?? null })
-  }
-
-  const groups = [...files.entries()]
-    .map(([file, rules]) => ({
-      file,
-      rules: rules.sort((a, b) => (a.ruleId < b.ruleId ? -1 : 1)),
-      total: rules.reduce((sum, rule) => sum + rule.value, 0),
-    }))
-    .sort((a, b) => b.total - a.total || (a.file < b.file ? -1 : 1))
-
-  if (json) {
-    console.log(JSON.stringify({ version: raw?.version ?? null, entries: baseline.entries, ratchets: baseline.ratchets, firstSeen: baseline.firstSeen, groups }, null, 2))
-    return 0
-  }
-  if (groups.length === 0) {
-    console.log(`baseline 还是空的（${config.baseline.path}）：跑一次 npx fe-guard baseline 把存量记进来。`)
-    return 0
-  }
-
-  const limit = all ? groups.length : 20
-  console.log(`fe-guard baseline: ${config.baseline.path}（version ${raw?.version ?? '?'}）`)
-  console.log(
-    `  ${groups.length} 个文件，${Object.keys(baseline.entries).length} 条规则型 + ` +
-      `${Object.keys(baseline.ratchets).length} 条指标型`,
-  )
-  console.log('')
-  groups.slice(0, limit).forEach((group) => {
-    console.log(`${group.file}  (${group.rules.length} 项)`)
-    group.rules.forEach((rule) => {
-      const unit = rule.kind === 'ratchet' ? '指标上限' : '条'
-      const since = rule.since ? `，首次 ${rule.since}` : '，首次 未知（旧版账本）'
-      console.log(`  ${rule.ruleId}  ${rule.value} ${unit}${since}`)
-    })
-  })
-  if (groups.length > limit) console.log(`...还有 ${groups.length - limit} 个文件，用 --all 查看`)
-  console.log('')
-  console.log('这些是已经接受的存量欠债，不是新增问题；收紧会自动发生，放宽必须 --widen 并留下记录。')
-  return 0
-}
-
-/** 按规则聚合：直接回答“先修哪几条能消掉最多条”。 */
-function showByRule({ config, raw, baseline, json }) {
-  const rules = new Map()
-  const touch = (ruleId, kind, file, value, since) => {
-    if (!rules.has(ruleId)) {
-      rules.set(ruleId, { ruleId, kind, count: 0, files: new Set(), firstSeen: since ?? null })
-    }
-    const item = rules.get(ruleId)
-    item.count += kind === 'entry' ? value : 1
-    item.files.add(file)
-    if (since && (!item.firstSeen || since < item.firstSeen)) item.firstSeen = since
-  }
-  for (const [key, count] of Object.entries(baseline.entries)) {
-    const { file, ruleId } = parseKey(key)
-    touch(ruleId, 'entry', file, count, baseline.firstSeen[key])
-  }
-  for (const [key] of Object.entries(baseline.ratchets)) {
-    const { file, ruleId } = parseKey(key)
-    touch(ruleId, 'ratchet', file, 1, baseline.firstSeen[key])
-  }
-
-  const list = [...rules.values()]
-    .map((item) => ({ ...item, files: item.files.size }))
-    .sort((a, b) => b.count - a.count || a.ruleId.localeCompare(b.ruleId))
-  const totalEntries = Object.values(baseline.entries).reduce((sum, value) => sum + value, 0)
-
-  if (json) {
-    console.log(JSON.stringify({ version: raw?.version ?? null, totalEntries, rules: list }, null, 2))
-    return 0
-  }
-  if (list.length === 0) {
-    console.log(`baseline 还是空的（${config.baseline.path}）：跑一次 npx fe-guard baseline 把存量记进来。`)
-    return 0
-  }
-
-  console.log(`fe-guard baseline --by-rule: ${config.baseline.path}（version ${raw?.version ?? '?'}）`)
-  console.log(`  条数型存量共 ${totalEntries} 条，分布在 ${list.length} 条规则上`)
-  console.log('')
-  console.log('按可清理条数排序（先修上面的，收益最大）：')
-  list.slice(0, 20).forEach((item, index) => {
-    const unit = item.kind === 'ratchet' ? '个文件命中指标' : '条'
-    const since = item.firstSeen ? `，首次 ${item.firstSeen}` : ''
-    console.log(`  ${String(index + 1).padStart(2)}. ${item.ruleId}  ${item.count} ${unit}，涉及 ${item.files} 个文件${since}`)
-  })
-  if (list.length > 20) console.log(`  ...还有 ${list.length - 20} 条规则，用 --json 看全部`)
-  const top3 = list.filter((item) => item.kind === 'entry').slice(0, 3)
-  const topTotal = top3.reduce((sum, item) => sum + item.count, 0)
-  if (top3.length > 0) {
-    const ratio = totalEntries > 0 ? Math.round((topTotal / totalEntries) * 1000) / 10 : 0
-    console.log('')
-    console.log(
-      `下一步: 先修 ${top3.map((item) => item.ruleId).join(' / ')}，预计减少 ${topTotal} 条` +
-        `（占条数型存量的 ${ratio}%）。`,
+/**
+ * package 模式更新：只跑一次真实检查，按文件归属拆到每本账；
+ * 有 blocking 且没加 --widen 时一本都不写，避免“部分包被放宽、部分包没写”的半成品状态。
+ */
+async function updatePackages({ root, config, widen, followRenames }) {
+  if (followRenames) {
+    throw new UserError(
+      'package 模式暂不支持 --follow-renames：重命名可能同时改变文件归属，需要先确认账本拆分正确，再手动处理跨包移动。\n' +
+        '  可先运行 npx fe-guard baseline --show 查看各账本，或回到 root 模式完成迁移。',
     )
   }
-  console.log('  说明：这里只按数量排序，不代表修起来最容易；修完跑 baseline 会自动收紧。')
+  const workspace = detectWorkspace(root)
+  const layout = loadLedgerLayout({ root, config, workspace })
+  assertNoStaleRootEntries(layout.ledgers)
+
+  const enabled = (ruleId) => checkEnabled(config, adapterOfRule(ruleId)) && !isBaselineExempt(ruleId)
+  const { current, currentRatchets } = await collectCurrent({ root, config })
+  const currentByOwner = splitByOwner(current, layout.packages)
+  const ratchetsByOwner = splitByOwner(currentRatchets, layout.packages)
+
+  const rows = layout.ledgers.map((ledger) => {
+    const ownerCurrent = currentByOwner.get(ledger.pkg.rel) ?? {}
+    const ownerRatchets = ratchetsByOwner.get(ledger.pkg.rel) ?? {}
+    return {
+      ledger,
+      previous: ledger.baseline,
+      current: ownerCurrent,
+      currentRatchets: ownerRatchets,
+      plan: planUpdate({
+        previous: ledger.baseline,
+        enabled,
+        current: ownerCurrent,
+        currentRatchets: ownerRatchets,
+        widen,
+      }),
+    }
+  })
+
+  const blocking = rows.flatMap((row) =>
+    row.plan.blocking.map((item) => ({ ...item, packageLabel: row.ledger.label })),
+  )
+  if (blocking.length > 0 && !widen) return reportBlocking(blocking)
+
+  for (const row of rows) {
+    const { ledger, previous, plan } = row
+    const changed =
+      !sameEntries(previous.entries, plan.nextEntries) ||
+      !sameEntries(previous.ratchets, plan.nextRatchets) ||
+      plan.widenLog.length !== previous.widenLog.length
+    const empty = Object.keys(plan.nextEntries).length + Object.keys(plan.nextRatchets).length === 0
+    const written = changed && (ledger.exists || !empty)
+    if (written) {
+      saveBaseline(ledger.file, plan.nextEntries, plan.nextRatchets, {
+        firstSeen: plan.firstSeen,
+        widenLog: plan.widenLog,
+      })
+    }
+    // 不存在的空账本不创建文件，也不打印“已更新”的假摘要。
+    if (ledger.exists || written) {
+      printUpdateSummary({
+        config,
+        previous,
+        plan,
+        current: row.current,
+        currentRatchets: row.currentRatchets,
+        label: ledgerLabel(ledger),
+        advice: false,
+      })
+    }
+  }
+  console.log('')
+  printCommitAdvice()
   return 0
 }
 
-async function verifyBaseline({ root, baselinePath, json, base }) {
-  if (!loadBaselineRaw(baselinePath)) {
-    throw new UserError(`找不到 ${path.relative(root, baselinePath)}，无法校验 baseline。`)
-  }
-  const rel = toPosix(path.relative(root, baselinePath))
-  const baselineRef = await resolveBase(root, base)
-  const baseFile = await run('git', ['show', `${baselineRef.sha}:./${rel}`], { cwd: root })
-  if (baseFile.missing) throw new UserError('--verify 需要 git，但当前环境找不到 git 命令。')
+function ledgerLabel(ledger) {
+  return ledger.pkg.isRoot ? ledger.relPath : `${ledger.label} (${ledger.relPath})`
+}
 
-  let baseRaw = { entries: {}, ratchets: {} }
-  if (baseFile.code !== 0) {
-    const message = baseFile.stderr || baseFile.stdout || ''
-    // 基线提交里还没有 baseline 文件 = 首次入账，按空账本比较；
-    // 其余失败（对象不存在、不是 git 仓库等）必须报错，不能当成空账本放行。
-    if (!/does not exist|exists on disk, but not in|not in '.*'|path .* not in/i.test(message)) {
-      throw new UserError(
-        `无法读取基线 ${baselineRef.ref}（${baselineRef.sha.slice(0, 8)}）里的 ${rel}。\n` +
-          '首次接入时请先把 baseline 提交，再在 CI 里启用 --verify；如果是新仓库，请确认 --base 指向的提交里已有 baseline。\n' +
-          message.trim(),
-      )
-    }
-  } else {
-    try {
-      baseRaw = JSON.parse(baseFile.stdout)
-    } catch {
-      throw new UserError(`基线 ${baselineRef.ref} 里的 ${rel} 不是合法 JSON。`)
-    }
-  }
+/** show/verify/trend 的 package 选择：读全量布局，selector 只决定展示哪一本。 */
+function packageLayout({ root, config, selector }) {
+  return loadLedgerLayout({ root, config, workspace: detectWorkspace(root), selector })
+}
 
-  const current = loadBaseline(baselinePath)
-  const comparison = compareWithBase(baseRaw, current)
+async function showBaselineCommand({ root, config, baselinePath, all, json, byRule, packageName }) {
+  if (config.baseline.strategy !== 'package') {
+    // root 模式只有一本账；这里显式触发 loadLedgerLayout 的统一报错。
+    if (packageName !== undefined) packageLayout({ root, config, selector: packageName })
+    return showLedger({ config, baselinePath, all, json, byRule })
+  }
+  const layout = packageLayout({ root, config, selector: packageName })
+  if (layout.selected) {
+    const ledger = layout.ledgers[0]
+    return showLedger({
+      config,
+      baselinePath: ledger.file,
+      all,
+      json,
+      byRule,
+      view: ledgerView(ledger),
+      label: ledger.relPath,
+      jsonExtra: { package: ledger.pkg.name, path: ledger.relPath },
+    })
+  }
 
   if (json) {
-    console.log(JSON.stringify({ ok: comparison.unapproved.length === 0, base: baselineRef, ...comparison }, null, 2))
+    const ledgers = layout.ledgers.map((ledger) => ({
+      package: ledger.pkg.name,
+      label: ledger.label,
+      path: ledger.relPath,
+      exists: ledger.exists,
+      version: ledger.exists ? ledger.baseline.version : null,
+      entries: ledger.baseline.entries,
+      ratchets: ledger.baseline.ratchets,
+      firstSeen: ledger.baseline.firstSeen,
+      summary: summarizeBaseline(ledger.baseline),
+    }))
+    console.log(JSON.stringify({ strategy: 'package', ledgers }, null, 2))
+    return 0
+  }
+
+  const existing = layout.ledgers.filter((ledger) => ledger.exists)
+  if (existing.length === 0) {
+    console.log('还没有任何 package 账本：跑一次 npx fe-guard baseline 把存量记进来。')
+    return 0
+  }
+  existing.forEach((ledger, index) => {
+    console.log(`== ${ledger.label} (${ledger.relPath}) ==`)
+    showLedger({
+      config,
+      baselinePath: ledger.file,
+      all,
+      json: false,
+      byRule,
+      view: ledgerView(ledger),
+      label: ledger.relPath,
+    })
+    if (index < existing.length - 1) console.log('')
+  })
+  return 0
+}
+
+/** 直接把 layout 里已解析的账本塞给 show，避免同一本账重复读盘。 */
+function ledgerView(ledger) {
+  return {
+    raw: ledger.exists ? { version: ledger.baseline.version } : null,
+    baseline: ledger.baseline,
+  }
+}
+
+async function trendBaseline({ root, config, baselinePath, json, limit, packageName }) {
+  if (config.baseline.strategy !== 'package') {
+    if (packageName !== undefined) packageLayout({ root, config, selector: packageName })
+    const data = await collectBaselineTrend({ root, baselinePath, limit })
+    console.log(json ? JSON.stringify(data, null, 2) : formatTrend(data))
+    return 0
+  }
+
+  const layout = packageLayout({ root, config, selector: packageName })
+  if (layout.selected) {
+    const ledger = layout.ledgers[0]
+    const data = await collectBaselineTrend({ root, baselinePath: ledger.file, limit })
+    console.log(
+      json ? JSON.stringify({ ...data, package: ledger.pkg.name, path: ledger.relPath }, null, 2) : formatTrend(data),
+    )
+    return 0
+  }
+
+  const existing = layout.ledgers.filter((ledger) => ledger.exists)
+  if (existing.length === 0) {
+    console.log('还没有任何 package 账本，趋势暂无数据：先跑一次 npx fe-guard baseline 并把账本提交。')
+    return 0
+  }
+  const ledgers = []
+  for (const ledger of existing) {
+    const data = await collectBaselineTrend({ root, baselinePath: ledger.file, limit })
+    ledgers.push({ package: ledger.pkg.name, label: ledger.label, path: ledger.relPath, trend: data })
+  }
+  if (json) {
+    console.log(
+      JSON.stringify(
+        { mode: 'package', ledgers: ledgers.map(({ package: name, path: rel, trend }) => ({ package: name, path: rel, trend })) },
+        null,
+        2,
+      ),
+    )
+    return 0
+  }
+  ledgers.forEach((ledger, index) => {
+    console.log(`== ${ledger.label} (${ledger.path}) ==`)
+    console.log(formatTrend(ledger.trend))
+    if (index < ledgers.length - 1) console.log('')
+  })
+  return 0
+}
+
+async function verifyBaseline({ root, config, baselinePath, json, base, packageName }) {
+  if (config.baseline.strategy !== 'package') {
+    if (packageName !== undefined) packageLayout({ root, config, selector: packageName })
+    const view = loadBaselineView(baselinePath)
+    if (!view.raw) {
+      throw new UserError(`找不到 ${path.relative(root, baselinePath)}，无法校验 baseline。`)
+    }
+    const rel = toPosix(path.relative(root, baselinePath))
+    const baselineRef = await resolveBase(root, base)
+    const { raw } = await readBaseRaw({ root, rel, baselineRef })
+    const comparison = compareWithBase(raw ?? { entries: {}, ratchets: {} }, view.baseline)
+    if (json) {
+      console.log(JSON.stringify({ ok: comparison.unapproved.length === 0, base: baselineRef, ...comparison }, null, 2))
+      return comparison.unapproved.length === 0 ? 0 : 1
+    }
+    printVerifyResult({ rel, baselineRef, comparison })
     return comparison.unapproved.length === 0 ? 0 : 1
   }
 
-  printVerifyResult({ rel, baselineRef, comparison })
-  return comparison.unapproved.length === 0 ? 0 : 1
-}
-
-/** 把当前账本与基线账本逐项比较：放宽、未登记放宽、首次入账。 */
-function compareWithBase(baseRaw, current) {
-  const baseEntries = flattenRaw(baseRaw.entries, true)
-  const baseRatchets = flattenRaw(baseRaw.ratchets, false)
-
-  const widenings = []
-  for (const [key, value] of Object.entries(current.entries)) {
-    const before = baseEntries[key] ?? 0
-    if (value > before) widenings.push({ ...parseKey(key), kind: 'entry', from: before, to: value })
-  }
-  for (const [key, value] of Object.entries(current.ratchets)) {
-    const before = baseRatchets[key] ?? 0
-    if (value > before) widenings.push({ ...parseKey(key), kind: 'ratchet', from: before, to: value })
-  }
-
-  const baseFirstEntries = Object.keys(baseEntries).length === 0
-  const baseFirstRatchets = Object.keys(baseRatchets).length === 0
-  const adoptedEntries =
-    baseFirstEntries && current.widenLog.some((event) => event.type === 'initial-adoption' && event.entries > 0)
-  const adoptedRatchets =
-    baseFirstRatchets && current.widenLog.some((event) => event.type === 'initial-adoption' && event.ratchets > 0)
-
-  const allowed = new Map()
-  for (const event of current.widenLog) {
-    for (const item of event.items ?? []) {
-      const key = `${item.file}::${item.ruleId}`
-      allowed.set(key, Math.max(allowed.get(key) ?? 0, item.to ?? 0))
+  const layout = packageLayout({ root, config, selector: packageName })
+  const baselineRef = await resolveBase(root, base)
+  const results = []
+  for (const ledger of layout.ledgers) {
+    const { raw } = await readBaseRaw({ root, rel: ledger.relPath, baselineRef })
+    const baseExists = raw !== null
+    if (!ledger.exists && !baseExists) {
+      if (layout.selected) {
+        throw new UserError(
+          `找不到 ${ledger.relPath}，基线里也没有这本账；无法校验 package "${ledger.pkg.name}"。`,
+        )
+      }
+      continue
     }
-  }
-  const unapproved = widenings.filter((item) => {
-    if (item.kind === 'entry' ? adoptedEntries : adoptedRatchets) return false
-    return (allowed.get(`${item.file}::${item.ruleId}`) ?? 0) < item.to
-  })
-
-  return {
-    widenings,
-    unapproved,
-    baseEmpty: baseFirstEntries && baseFirstRatchets,
-    adoptedEntries,
-    adoptedRatchets,
-  }
-}
-
-function printVerifyResult({ rel, baselineRef, comparison }) {
-  const { widenings, unapproved, baseEmpty, adoptedEntries, adoptedRatchets } = comparison
-  console.log(`fe-guard baseline --verify: ${rel}`)
-  console.log(`  基线 ${baselineRef.ref}（merge-base ${baselineRef.sha.slice(0, 8)}）`)
-  if (baseEmpty) console.log('  基线里还没有 baseline 文件：按首次入账处理（需要 widenLog 的 initial-adoption 记录）')
-  console.log(`  与基线对比：放宽 ${widenings.length} 项，其中未登记 ${unapproved.length} 项`)
-  if ((adoptedEntries || adoptedRatchets) && widenings.length > 0) {
-    const tracks = [adoptedEntries ? '条数' : null, adoptedRatchets ? '指标' : null].filter(Boolean).join(' / ')
-    console.log(`  这是首次入账（基线账本里还没有${tracks}轨道），widenLog 里有 initial-adoption 记录。`)
-  }
-  if (widenings.length === 0) {
-    console.log('  没有放宽，通过。收紧不需要确认。')
-    return 0
-  }
-  if (unapproved.length === 0) {
-    console.log('  所有放宽都能在 widenLog 里找到对应记录，通过。')
-    return 0
-  }
-  console.log('')
-  console.log('以下放宽没有 --widen 记录，属于“静默放宽”，拒绝通过：')
-  unapproved.forEach((item) => console.log(`  ${item.file}  ${item.ruleId}  ${item.from} -> ${item.to}`))
-  console.log('')
-  console.log('如果确实要接受这批欠债：npx fe-guard baseline --widen，然后单独提交 baseline 并写明原因。')
-  return 1
-}
-
-/**
- * 确定“上一次被批准的状态”：
- * 1. 显式 --base；
- * 2. CI 环境变量 GITHUB_BASE_SHA / GITHUB_BASE_REF（PR 的目标分支）；
- * 3. 本地分支的 upstream；
- * 4. 都没有就报错，绝不默认拿 HEAD（PR 里 HEAD 就是自己，等于永远通过）。
- */
-async function resolveBase(root, base) {
-  const candidates = []
-  if (base) candidates.push(base)
-  else {
-    if (process.env.GITHUB_BASE_SHA) candidates.push(process.env.GITHUB_BASE_SHA)
-    if (process.env.GITHUB_BASE_REF) {
-      candidates.push(`origin/${process.env.GITHUB_BASE_REF}`, process.env.GITHUB_BASE_REF)
-    }
-    if (candidates.length === 0) {
-      const upstream = await run('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], {
-        cwd: root,
+    if (!ledger.exists && baseExists) {
+      results.push({
+        package: ledger.pkg.name,
+        label: ledger.label,
+        path: ledger.relPath,
+        exists: false,
+        deleted: true,
+        comparison: null,
       })
-      if (upstream.code === 0 && upstream.stdout.trim()) candidates.push(upstream.stdout.trim())
+      continue
     }
+    results.push({
+      package: ledger.pkg.name,
+      label: ledger.label,
+      path: ledger.relPath,
+      exists: true,
+      deleted: false,
+      comparison: compareWithBase(raw ?? { entries: {}, ratchets: {} }, ledger.baseline),
+    })
   }
 
-  if (candidates.length === 0) {
-    throw new UserError(
-      'baseline --verify 无法确定比较基线，拒绝在“没有基线”的情况下判定通过。\n' +
-        '  修复：显式传入 --base <ref>（例如 --base origin/main），或在 CI 里设置 GITHUB_BASE_REF / GITHUB_BASE_SHA。\n' +
-        '  为什么不能默认 HEAD：CI 检出的 HEAD 就是 PR 自己，放宽会随 PR 一起提交，对比 HEAD 永远得到 0 项放宽。',
+  const ok = results.every((item) => !item.deleted && item.comparison.unapproved.length === 0)
+  if (json) {
+    const ledgers = results.map(({ package: name, path: rel, exists, deleted, comparison }) => ({
+      package: name,
+      path: rel,
+      exists,
+      deleted,
+      comparison,
+    }))
+    console.log(JSON.stringify({ ok, mode: 'package', base: baselineRef, ledgers }, null, 2))
+    return ok ? 0 : 1
+  }
+  if (results.length === 0) {
+    console.log('没有任何 package 账本可校验。')
+    return 0
+  }
+  results.forEach((item, index) => {
+    console.log(`== ${item.label} (${item.path}) ==`)
+    printVerifyResult({ rel: item.path, baselineRef, comparison: item.comparison, deleted: item.deleted })
+    if (index < results.length - 1) console.log('')
+  })
+  return ok ? 0 : 1
+}
+
+/** 把根账本里属于 workspace package 的条目拆到各自账本；冲突时不写任何文件。 */
+function migrateBaseline({ root, config, dryRun }) {
+  const plan = planMigratePackages({ root, config, workspace: detectWorkspace(root) })
+  if (plan.conflicts.length > 0) {
+    console.error('fe-guard baseline --migrate-packages 被拒绝：目标 package 账本里已有同 key 不同值。')
+    plan.conflicts.forEach((item) => {
+      console.error(`  ${item.package}  ${item.path}  ${item.key}  ${item.from} -> ${item.to}`)
+    })
+    console.error('')
+    console.error('请先人工确认两份账本哪一份是对的，再重新迁移；本次没有写入任何文件。')
+    return 2
+  }
+  if (!plan.rootLedger.exists) {
+    console.log(`根账本 ${plan.rootLedger.relPath} 不存在，没有可迁移的条目。`)
+    return 0
+  }
+  if (plan.moved.length === 0) {
+    console.log(`根账本 ${plan.rootLedger.relPath} 里没有 package 文件条目，不需要迁移。`)
+    return 0
+  }
+
+  console.log(
+    dryRun
+      ? 'fe-guard baseline --migrate-packages --dry-run（只预览，不写文件）'
+      : 'fe-guard baseline --migrate-packages',
+  )
+  for (const item of plan.moved) {
+    console.log(
+      `  ${item.pkg.name} -> ${item.ledger.relPath}  ` +
+        `条目 ${item.entryCount} / 指标 ${item.ratchetCount}`,
     )
   }
-
-  const failures = []
-  for (const candidate of candidates) {
-    const mergeBase = await run('git', ['merge-base', 'HEAD', candidate], { cwd: root })
-    if (mergeBase.missing) throw new UserError('--verify 需要 git，但当前环境找不到 git 命令。')
-    if (mergeBase.code === 0 && mergeBase.stdout.trim()) {
-      return { ref: candidate, sha: mergeBase.stdout.trim() }
-    }
-    failures.push(`${candidate}: ${(mergeBase.stderr || mergeBase.stdout).trim() || '不是有效提交'}`)
-  }
-
-  throw new UserError(
-    `baseline --verify 无法计算 merge-base（候选基线：${candidates.join(', ')}）。\n` +
-      `  ${failures.join('\n  ')}\n` +
-      '  修复：确认 --base 指向的分支已 fetch；shallow clone 请先 git fetch --unshallow 或 fetch 目标分支。',
+  console.log(
+    `  根账本剩余: ${Object.keys(plan.rootEntries).length} 条条目 / ` +
+      `${Object.keys(plan.rootRatchets).length} 条指标`,
   )
-}
-
-function flattenRaw(shape, integer) {
-  const result = {}
-  for (const [file, rules] of Object.entries(shape ?? {})) {
-    for (const [ruleId, value] of Object.entries(rules ?? {})) {
-      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) continue
-      result[`${file}::${ruleId}`] = integer ? Math.floor(value) : value
-    }
+  if (!dryRun) {
+    applyMigratePackages(plan)
+    console.log(`  已写入 ${plan.moved.length} 本 package 账本（保留 firstSeen，并记录 initial-adoption）。`)
   }
-  return result
-}
-
-function filterKeys(entries, predicate) {
-  const result = {}
-  for (const [key, value] of Object.entries(entries)) {
-    const { ruleId } = parseKey(key)
-    if (predicate(ruleId)) result[key] = value
+  if (config.baseline.strategy === 'root') {
+    console.log('提示：文件已就绪；把 baseline.strategy 改为 "package" 后生效。')
   }
-  return result
-}
-
-function widerCounts(current, allowed) {
-  const widened = []
-  for (const [key, count] of Object.entries(current)) {
-    const limit = allowed[key] ?? 0
-    if (count > limit) {
-      const { file, ruleId } = parseKey(key)
-      widened.push({ file, ruleId, kind: 'entry', from: limit, to: count })
-    }
-  }
-  return widened
-}
-
-function widerRatchets(current, allowed) {
-  const widened = []
-  for (const [key, value] of Object.entries(current)) {
-    const limit = allowed[key] ?? 0
-    if (value > limit) {
-      const { file, ruleId } = parseKey(key)
-      widened.push({ file, ruleId, kind: 'ratchet', from: limit, to: value })
-    }
-  }
-  return widened
+  return 0
 }

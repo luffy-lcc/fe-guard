@@ -29,6 +29,14 @@ It doesn't chase "conventions are everything". It does one thing: make "no worse
 - **The component inventory doesn't live in context**: it's written to disk and the AI queries it on demand via `ui_lookup`. Paying resident tokens for occasionally-used information is a bad trade, and the inventory grows with the project — any cached copy goes stale on update.
 - **Failure still leaves evidence**: even when the check fails, the report, baseline tightening, and gate evidence are produced as usual, for post-mortems.
 
+## package-level baseline design
+
+- **Ledger layout is opt-in and additive.** `baseline.strategy` defaults to `root` (one ledger, unchanged behavior). `"package"` keeps root-level files in `baseline.path` and writes every workspace package's files to `<package>/<baseline.packageFile>`. Keys stay repo-relative, so comparison, tightening and `--verify` reuse the same core as root mode.
+- **Ownership is deterministic.** A file belongs to the package with the longest matching prefix; everything else belongs to root. One file has exactly one owner, so entries cannot be counted twice across ledgers, and `combineLedgers` rejects duplicates instead of picking a winner.
+- **One evaluation, per-package write-back.** `check` combines the ledgers into one view, evaluates the run once, then splits the next entries / ratchets back by owner and writes only ledgers that changed; a non-existent empty ledger is never created. `baseline` aborts before any write when a blocking entry lacks `--widen`, so no package is left half-updated.
+- **Migration preserves audit fields.** `--migrate-packages` keeps `firstSeen`, appends `initial-adoption` (so a brand-new package ledger can pass `--verify`) and a `migrate-packages` event naming source and target. Conflicts exit 2 without writing, because choosing a value automatically would silently wipe one side's history.
+- **Stale-root guard.** Root entries that belong to a package make `check` / `baseline` fail before evaluating anything. The alternative — ignoring them — would silently unfreeze debt, so the guard is a deliberate hard stop with a migration hint.
+
 ## Workflow evidence model
 
 The workflow layer turns "done" into facts that can be checked:
@@ -57,6 +65,7 @@ fe-guard/
 │   ├── not-executed.js          the "check not executed" violation type (non-baselineable)
 │   ├── check-core.js            check kernel shared by CLI and MCP gate; routes the count/value tracks
 │   ├── baseline.js              ratchet core: count/value comparison, tightening, disk format (pure functions, unit-tested)
+│   ├── baseline-packages.js     package-mode ledgers: layout, owner split, migrate plan, stale-root guard
 │   ├── workspace.js             monorepo detection, per-package planning, config and bin resolution
 │   ├── workspace-boundaries.js  monorepo cross-package rules (generated depcruise config + edge filter)
 │   ├── timing.js                per-check and per-package timing
@@ -69,7 +78,7 @@ fe-guard/
 │   ├── sarif.js                 report → SARIF 2.1.0 (new violations + not-executed only)
 │   ├── html.js                  single-file HTML report (inline CSS/JS, zero external assets)
 │   ├── version.js               tool version shared by SARIF / HTML / --version
-│   ├── commands/                init / check / baseline / feedback / doctor / task
+│   ├── commands/                init / check / baseline (+ baseline-shared.js core) / feedback / doctor / task
 │   ├── workflow/                workflow core: state.js (events / stages) / definitions.js (tool schemas) /
 │   │                            criteria.js (type / source / verify) / evidence.js (snapshots + fingerprints) /
 │   │                            gate.js / preflight.js / lessons.js / statistics.js / settings.js /
@@ -102,6 +111,6 @@ npm run verify:ts7     # TS 7 smoke test: real typescript@7 diagnostics still pa
 npm run self-check     # check fe-guard itself with its fast profile
 ```
 
-No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 135, v3 83, v4 60 — all passing; `npm test` passes 174, including the workflow contract (structured criteria, confirm / defer), manual evidence and gate snapshots, preflight, rework diff, lessons / distill and `task stats`.
+No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 135, v3 83, v4 69 — all passing; `npm test` passes 184, including the workflow contract (structured criteria, confirm / defer), manual evidence and gate snapshots, preflight, rework diff, lessons / distill, `task stats`, and package-level baseline (split, migration, `--show` / `--verify` / `--trend --package`, stale-root guard).
 
 If any step deviates from expectations, the script prints the expected value, the actual value, and the full output, then exits with code 1. See [CONTRIBUTING](../CONTRIBUTING.md) for the contribution guide.

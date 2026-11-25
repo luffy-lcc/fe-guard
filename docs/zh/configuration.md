@@ -86,7 +86,12 @@
       "ignore": ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "*.min.js", "dist/**", ".fe-guard/**", "fe-guard.baseline.json"]
     }
   },
-  "baseline": { "path": "fe-guard.baseline.json", "autoTighten": true },
+  "baseline": {
+    "path": "fe-guard.baseline.json",
+    "strategy": "root",
+    "packageFile": "fe-guard.baseline.json",
+    "autoTighten": true
+  },
   "report": { "path": ".fe-guard/report.json" },
   "feedback": { "path": ".fe-guard/false-positives.jsonl" },
   "diff": { "base": "HEAD" },
@@ -130,6 +135,8 @@
 | `checks.metrics.duplication.normalizeIdentifiers` | 默认 `false`。开启后非关键字标识符按首现顺序归一化，「复制改名」的重复也能命中；代价是结构相似但语义不同的代码会命中，误报走 false-positive 记录 |
 | `checks.diff-size.maxFiles` / `maxLines` | 本次改动的文件数 / 新增行数上限，超过即失败 |
 | `checks.diff-size.ignore` | 大 diff 统计时忽略的路径（lock 文件、构建产物、`.fe-guard/`、baseline 本身） |
+| `baseline.strategy` | `root`（默认）保持全仓库一本账，旧配置行为不变；`package` 让每个 workspace package 各有一本账。`package` 要求能识别出 workspace（`workspaces` / `pnpm-workspace.yaml` / `lerna.json`），单仓库必须保持 `root` |
+| `baseline.packageFile` | package 模式下每个 package 的账本文件名，相对**该 package 目录**（默认 `fe-guard.baseline.json`，即 `apps/web/fe-guard.baseline.json`）。禁止绝对路径与 `..`；请放在被跟踪的目录里——放在 gitignore 路径下账本不会提交 |
 | `baseline.autoTighten` | 默认 `true`：`check` 通过时把修掉的存量写回 baseline（条数和数值两本账都会收紧）。只读环境设为 `false` |
 | `feedback.path` | 误报记录（JSONL）的落盘路径。只追加、可审计，不会被 `check` 读取成忽略名单 |
 | `report.path` | 报告文件路径 |
@@ -156,6 +163,8 @@
 - **deps / ui / metrics / boundaries 这些根级检查只执行一次**，但会把默认的扫描根 `src` 自动展开成各子包的源码目录。
 - 多包**并行**执行；报告里带每个包的耗时，stdout 会打印各检查项总耗时。
 - 某个包有配置但执行失败（如 ESLint 配置本身抛错）会**直接失败并指出包名**，不会静默算通过。
+
+**baseline 也可以按 package 记账。** 配置 `"baseline": { "strategy": "package", "packageFile": "fe-guard.baseline.json" }`（package 模式依赖上面的 workspace 识别）。根级文件仍用 `baseline.path`，每个 package 下的文件写到 `<package>/<packageFile>`。老仓库先跑一次 `npx fe-guard baseline --migrate-packages` 拆分根账本，提交后再跑 `npx fe-guard check`。`baseline --show` / `--verify` / `--trend` 支持 `--package <name|rel>`。root 模式仍是默认。详见 [monorepo：package 级账本](baseline.md)。
 
 想退回“只在仓库根跑一次”：
 

@@ -23,6 +23,7 @@ fe-guard does one thing: make "**no worse than before**" automatic. Legacy debt 
 - **Zero runtime dependencies**, Node 18+, ESM — the install is just a few source files.
 - **Seven checks**: ESLint / TypeScript / architecture boundaries (orchestrating external tools) + dependency guard / component inventory / rot metrics / large-diff (built-in, lightweight).
 - **Dual-track baseline ratchet**: counts + metric maxima, only tightens, auditable via `firstSeen` / `widenLog`.
+- **monorepo per-package ledgers**: optional `baseline.strategy: "package"` gives each workspace package its own ledger (with `--migrate-packages` for existing repos); root mode stays the default.
 - **MCP workflow layer**: event-sourced, stages derived from events, the AI cannot self-report "passed"; criteria can bind a test that the gate really runs.
 - **Structured contract with human gates**: every criterion needs `type` (ui / interaction / data / tracking / compat / performance) + `source`; `assumption` items must be confirmed by a human (`task confirm`), and a human can turn criteria into `deferred` release todos (`task defer`) — delivery is then marked `degraded` and reported as "N done / M deferred", never "all done".
 - **Evidence instead of claims**: every gate writes a snapshot to `.fe-guard/evidence/<taskId>/<evidenceId>.json`; `verify: manual` evidence is hashed (bytes + sha256); `completion` exposes `achieved / total / remaining / deferred`.

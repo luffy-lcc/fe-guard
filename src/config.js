@@ -4,6 +4,7 @@ import { UserError, normalizeTimeout, readJsonFile } from './utils.js'
 import { isNotExecutedRule } from './not-executed.js'
 import { DEFAULT_PROFILE, isProfileName, PROFILE_NAMES } from './profiles.js'
 import { normalizeWorkflow } from './workflow/settings.js'
+import { normalizeBaselinePackageFile, normalizeBaselineStrategy } from './baseline-packages.js'
 
 export const CONFIG_FILE = 'fe-guard.config.json'
 export const CONFIG_SCHEMA_VERSION = 1
@@ -33,6 +34,10 @@ export function defaultConfig() {
     checks: defaultChecks(),
     baseline: {
       path: 'fe-guard.baseline.json',
+      // root = 全仓库一本账（默认，兼容旧配置）；package = 每个 workspace package 一本账。
+      strategy: 'root',
+      // package 模式下的账本文件名，相对每个 package 目录。
+      packageFile: 'fe-guard.baseline.json',
       autoTighten: true,
     },
     feedback: {
@@ -191,6 +196,8 @@ export function normalizeConfig(raw, source = CONFIG_FILE) {
     checks: {},
     baseline: {
       path: raw.baseline?.path ?? 'fe-guard.baseline.json',
+      strategy: normalizeBaselineStrategy(raw.baseline?.strategy, source),
+      packageFile: normalizeBaselinePackageFile(raw.baseline?.packageFile, source),
       autoTighten: raw.baseline?.autoTighten !== false,
     },
     feedback: { path: raw.feedback?.path ?? '.fe-guard/false-positives.jsonl' },

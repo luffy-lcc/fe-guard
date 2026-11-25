@@ -3,8 +3,9 @@ import path from 'node:path'
 import { loadConfig, resolveConfigFile, SUPPORTED_CHECKS } from '../config.js'
 import { applyProfile } from '../check-core.js'
 import { loadBaseline, parseKey } from '../baseline.js'
+import { loadLedgerLayout, summarizeBaseline } from '../baseline-packages.js'
 import { detectWorkspace, eslintConfigFor, tsconfigFor, hasVueFile } from '../workspace.js'
-import { walkSourceFiles } from '../utils.js'
+import { run, walkSourceFiles } from '../utils.js'
 
 const LABELS = {
   eslint: 'ESLint',
@@ -30,12 +31,7 @@ export async function doctorCommand({ root, configPath, profile, json }) {
     : [{ name: '(root)', dir: root, rel: '' }]
 
   const timings = readTimings(root, config)
-  const baseline = loadBaseline(path.join(root, config.baseline.path))
-  const baselineFile = path.join(root, config.baseline.path)
-  const lines = existsSync(baselineFile) ? readFileSync(baselineFile, 'utf8').split('\n').length - 1 : 0
-  const ruleEntries = Object.keys(baseline.entries)
-  const ruleCount = new Set(ruleEntries.map((key) => parseKey(key).ruleId)).size
-  const entryCount = Object.values(baseline.entries).reduce((sum, value) => sum + value, 0)
+  const baseline = await baselineOf({ root, config, workspace })
 
   const report = {
     root,
@@ -47,14 +43,7 @@ export async function doctorCommand({ root, configPath, profile, json }) {
       packages: workspace.packages.map((pkg) => pkg.rel || '.'),
     },
     checks: [],
-    baseline: {
-      file: path.relative(root, baselineFile),
-      lines: Math.max(lines, 0),
-      files: new Set(ruleEntries.map((key) => parseKey(key).file)).size,
-      entries: entryCount,
-      rules: ruleCount,
-      ratchets: Object.keys(baseline.ratchets).length,
-    },
+    baseline,
   }
 
   for (const key of SUPPORTED_CHECKS) {
@@ -136,13 +125,68 @@ function printDoctor(report) {
   }
 
   print.push('')
-  print.push(
-    `baseline: ${baseline.lines} 行 / ${baseline.files} 文件 / ` +
-      `${baseline.entries} 条规则型（${baseline.rules} 条规则）+ ${baseline.ratchets} 条指标型`,
-  )
+  if (baseline.strategy === 'package') {
+    print.push(`baseline.strategy: package（${baseline.ledgers.length} 本 package 账本）`)
+    for (const ledger of baseline.ledgers) {
+      const state = ledger.exists
+        ? `${ledger.files} 文件 / ${ledger.entries} 条规则型 + ${ledger.ratchets} 条指标型`
+        : '不存在（未入账）'
+      print.push(
+        `  ${pad(ledger.label)}  ${ledger.path}  ${state}  最近变更: ${ledger.lastCommit ?? '未提交 / 未知'}`,
+      )
+    }
+  } else {
+    print.push('baseline.strategy: root')
+    print.push(
+      `baseline: ${baseline.lines} 行 / ${baseline.files} 文件 / ` +
+        `${baseline.entries} 条规则型（${baseline.rules} 条规则）+ ${baseline.ratchets} 条指标型`,
+    )
+  }
   print.push('未列出的文件（如 .md / .json / .css）不会进入任何检查；检查只看各项目注明的文件类型与扫描目录。')
   print.push('下一步: 钩子用 `fe-guard check --staged --profile fast`，提交/合并前手动跑 `fe-guard check --full`。')
   console.log(print.join('\n'))
+}
+
+/** 账本摘要：root 模式保持原有字段；package 模式逐本列出，最近变更时间读 git，读不到不编造。 */
+async function baselineOf({ root, config, workspace }) {
+  if (config.baseline.strategy !== 'package') {
+    const baselineFile = path.join(root, config.baseline.path)
+    const baseline = loadBaseline(baselineFile)
+    const lines = existsSync(baselineFile) ? readFileSync(baselineFile, 'utf8').split('\n').length - 1 : 0
+    const ruleEntries = Object.keys(baseline.entries)
+    return {
+      strategy: 'root',
+      file: path.relative(root, baselineFile),
+      lines: Math.max(lines, 0),
+      files: new Set(ruleEntries.map((key) => parseKey(key).file)).size,
+      entries: Object.values(baseline.entries).reduce((sum, value) => sum + value, 0),
+      rules: new Set(ruleEntries.map((key) => parseKey(key).ruleId)).size,
+      ratchets: Object.keys(baseline.ratchets).length,
+    }
+  }
+
+  const layout = loadLedgerLayout({ root, config, workspace })
+  const ledgers = []
+  for (const ledger of layout.ledgers) {
+    const summary = summarizeBaseline(ledger.baseline)
+    ledgers.push({
+      package: ledger.pkg.name,
+      label: ledger.label,
+      path: ledger.relPath,
+      exists: ledger.exists,
+      files: summary.files,
+      entries: summary.entries,
+      ratchets: summary.ratchets,
+      lastCommit: ledger.exists ? await lastCommit(root, ledger.relPath) : null,
+    })
+  }
+  return { strategy: 'package', ledgers }
+}
+
+async function lastCommit(root, rel) {
+  const result = await run('git', ['log', '-1', '--format=%aI', '--', rel], { cwd: root })
+  if (result.missing || result.code !== 0) return null
+  return result.stdout.trim() || null
 }
 
 function pad(label) {

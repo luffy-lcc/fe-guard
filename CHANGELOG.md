@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0]
+
+### Added
+
+- **Package-level baseline** (`baseline.strategy: "package"`, `baseline.packageFile`). Root files
+  (`package.json`, `scripts/`, repo-level configs) stay in `baseline.path`; each workspace package
+  gets `<package>/<packageFile>`; ownership is the longest package prefix. Root mode (`"root"`, the
+  default) is unchanged.
+- **`baseline --migrate-packages [--dry-run]`**: splits an existing root ledger by ownership,
+  preserves `firstSeen`, records `initial-adoption` / `migrate-packages` audit events, and exits 2
+  without writing any file on conflicts.
+- **`baseline --show` / `--verify` / `--trend --package <name|rel>`**: read, verify or trend a single
+  package ledger; a ledger deleted from the current tree but present in the merge-base fails
+  `--verify` instead of silently unfreezing debt.
+- **`doctor` per-package ledger summary**: prints `baseline.strategy`, each ledger path, file /
+  entry / ratchet counts and the latest git change (or "uncommitted / unknown").
+- Tests: `npm test` passes 184 and `verify-v4.mjs` reaches 69 assertions (v1 37 / v2 135 / v3 83
+  unchanged).
+
+### Changed
+
+- In package mode, a root ledger that still contains package entries makes `check` / `baseline`
+  fail with a `--migrate-packages` hint instead of dropping the entries.
+- Package mode does not support `--follow-renames` yet; it reports an explicit error.
+
 ## [0.4.0]
 
 ### Added

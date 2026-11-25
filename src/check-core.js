@@ -1,4 +1,3 @@
-import path from 'node:path'
 import {
   adapterOfRule,
   checkEnabled,
@@ -13,7 +12,6 @@ import { changedFiles, createStagedSnapshot } from './git.js'
 import {
   evaluate,
   evaluateRatchets,
-  loadBaseline,
   partitionEntries,
   partitionRatchets,
   sameEntries,
@@ -22,6 +20,13 @@ import {
 import { activeChecks, runChecks, STAGED_CONTENT_CHECKS } from './runners/index.js'
 import { buildReport, writeReport } from './report.js'
 import { detectWorkspace } from './workspace.js'
+import {
+  assertNoStaleRootEntries,
+  combineLedgers,
+  loadLedgerLayout,
+  saveEvaluatedLedgers,
+  summarizeBaseline,
+} from './baseline-packages.js'
 import { createTimings } from './timing.js'
 import { isNotExecutedRule, notExecuted } from './not-executed.js'
 
@@ -193,7 +198,7 @@ export async function runCheckCore({ root, mode = 'full', config, configPath, pr
       throw error
     }
 
-    const result = evaluateRun({ root, cfg, scope, violations })
+    const result = evaluateRun({ root, cfg, scope, violations, workspace })
     return finish({
       scope,
       evaluation: result.evaluation,
@@ -244,7 +249,7 @@ function writeInterruptedReport({ root, cfg, mode, scope, timings, workspace, pr
 }
 
 /** 对比 baseline、写回收紧、计算退出码。把“计算”从主流程里拆出来，便于单独读和测。 */
-function evaluateRun({ root, cfg, scope, violations }) {
+function evaluateRun({ root, cfg, scope, violations, workspace }) {
   const scopedViolations = scope
     ? violations.filter((violation) => scope.includes(violation.file) || isExempt(violation))
     : violations
@@ -254,8 +259,9 @@ function evaluateRun({ root, cfg, scope, violations }) {
   const measured = scopedViolations.filter((violation) => typeof violation.value === 'number' && !isExempt(violation))
   const exempt = scopedViolations.filter(isExempt)
 
-  const baselinePath = path.join(root, cfg.baseline.path)
-  const baseline = loadBaseline(baselinePath)
+  const layout = loadLedgerLayout({ root, config: cfg, workspace })
+  if (layout.strategy === 'package') assertNoStaleRootEntries(layout.ledgers)
+  const baseline = layout.strategy === 'package' ? combineLedgers(layout.ledgers) : layout.ledgers[0].baseline
   const inScope = (file, ruleId) => {
     const adapter = adapterOfRule(ruleId)
     if (!checkEnabled(cfg, adapter)) return false
@@ -284,11 +290,37 @@ function evaluateRun({ root, cfg, scope, violations }) {
   const baselineChanged =
     !sameEntries(baseline.entries, nextEntries) || !sameEntries(baseline.ratchets, nextRatchets)
   const baselineWritten = baselineChanged && cfg.baseline.autoTighten
+  let ledgerStatus = layout.ledgers.map((ledger) => ({
+    package: ledger.pkg.name,
+    label: ledger.label,
+    path: ledger.relPath,
+    exists: ledger.exists,
+    changed: false,
+    written: false,
+    ...summarizeBaseline(ledger.baseline),
+  }))
   if (baselineWritten) {
-    saveBaseline(baselinePath, nextEntries, nextRatchets, {
-      firstSeen: baseline.firstSeen,
-      widenLog: baseline.widenLog,
-    })
+    if (layout.strategy === 'package') {
+      ledgerStatus = saveEvaluatedLedgers({
+        ledgers: layout.ledgers,
+        nextEntries,
+        nextRatchets,
+        firstSeen: baseline.firstSeen,
+      }).ledgers
+    } else {
+      saveBaseline(layout.ledgers[0].file, nextEntries, nextRatchets, {
+        firstSeen: baseline.firstSeen,
+        widenLog: baseline.widenLog,
+      })
+      ledgerStatus = [
+        {
+          ...ledgerStatus[0],
+          changed: true,
+          written: true,
+          ...summarizeBaseline({ entries: nextEntries, ratchets: nextRatchets }),
+        },
+      ]
+    }
   }
 
   const failures = evaluation.violations.filter(
@@ -299,6 +331,11 @@ function evaluateRun({ root, cfg, scope, violations }) {
     scopedViolations,
     exitCode: failures.length > 0 ? 1 : 0,
     baseline: { entries: baseline.entries, ratchets: baseline.ratchets },
-    baselineStatus: { written: baselineWritten, changed: baselineChanged },
+    baselineStatus: {
+      written: baselineWritten,
+      changed: baselineChanged,
+      strategy: layout.strategy,
+      ledgers: ledgerStatus,
+    },
   }
 }

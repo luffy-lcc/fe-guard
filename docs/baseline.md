@@ -79,6 +79,77 @@ So to "accept new debt" you must explicitly run `npx fe-guard baseline --widen`,
 
 Why not record line numbers? Lines drift with formatting and inserted code, producing lots of false failures. We chose "same file + same rule" counting instead: low enough maintenance cost to block the vast majority of new violations. The trade-offs are documented in [known limitations](limitations.md).
 
+## monorepo: per-package ledgers
+
+One repository-wide ledger mixes every workspace package into the same file. Counts stay per `(file, rule)`, but the review question — "which package still carries debt, and did this change widen that package?" — has no answer; a rename or a move across packages rewrites entries that belong to another team. package mode gives each package its own ledger file while keeping the same ratchet semantics.
+
+The root ledger stays the default (`baseline.strategy: "root"`); nothing changes until you opt in.
+
+```json
+{
+  "baseline": {
+    "path": "fe-guard.baseline.json",
+    "strategy": "package",
+    "packageFile": "fe-guard.baseline.json",
+    "autoTighten": true
+  }
+}
+```
+
+`strategy: "package"` requires a detected workspace (`workspaces` in `package.json`, `pnpm-workspace.yaml`, or `lerna.json`); a single repo must keep `root`.
+
+Where each ledger lives:
+
+| Files | Ledger |
+| --- | --- |
+| Root `package.json`, `scripts/**`, repo-level configs | `baseline.path` (default root `fe-guard.baseline.json`) |
+| Files under a workspace package, e.g. `apps/web/**` | `apps/web/<baseline.packageFile>` (default `apps/web/fe-guard.baseline.json`) |
+
+Ownership is the longest package prefix: `apps/web-utils/x.ts` does not belong to `apps/web`, and any file outside all packages belongs to the root ledger. Keys inside a ledger are still repo-relative paths, so the check logic is unchanged.
+
+### How `baseline` and `--widen` behave
+
+- The real check runs once; results are split by ownership into each ledger.
+- With a blocking entry and no `--widen`: exit code 2 and **no ledger is written** — never a half-updated state where one package accepted debt and another did not.
+- With `--widen`: each package records its own `widenLog` entry.
+- Only ledgers that actually change are written; a missing empty ledger is not created.
+- `--follow-renames` is not supported in package mode (explicit error): a rename can also change ownership, so the split must be confirmed first. Use root mode for rename migration, or move the entries by hand.
+
+If the root ledger still contains entries for package files, `check` and `baseline` fail with a pointer to `baseline --migrate-packages`; the ledger is never silently dropped.
+
+### Migrating an existing root ledger
+
+```bash
+npx fe-guard baseline --migrate-packages --dry-run   # preview; writes nothing
+npx fe-guard baseline --migrate-packages             # split entries by ownership
+git add . && git commit -m "baseline: split root ledger per package"
+# if baseline.strategy is still "root", change it to "package" now
+npx fe-guard check
+```
+
+Migration moves `entries` / `ratchets` / `firstSeen` for package files into the package ledgers, keeps the original `firstSeen`, and appends `initial-adoption` + `migrate-packages` events so `--verify` recognizes the move. If a target ledger already has the same key with a different value, the command exits 2 and writes nothing — decide by hand which value is correct. When `strategy` is still `root`, the command prints "files are ready; switch strategy to package" after writing.
+
+### Viewing and verifying a single package
+
+```bash
+npx fe-guard baseline --show --package apps/web
+npx fe-guard baseline --verify --package apps/web --base origin/main
+npx fe-guard baseline --trend --package apps/web
+```
+
+- `--show --json` for one package adds `package` and `path` to the single ledger object; without `--package` it returns `{ "strategy": "package", "ledgers": [...] }`.
+- `--verify` compares every ledger against the merge-base. A ledger present in the base but missing now fails with "the ledger was deleted, historical debt was silently unfrozen"; when neither side has the ledger it is skipped in the all-package view and is an error with `--package`.
+- `--trend --json` without `--package` returns `{ "mode": "package", "ledgers": [{ "package", "path", "trend" }] }`.
+
+### Limits
+
+- package mode does not support `--follow-renames`.
+- A stale root ledger is a hard error (intentional).
+- A deleted package ledger is caught by `--verify`, not by `check` alone.
+- `packageFile` must stay inside the package; keep it in a tracked directory, otherwise the ledger is not committed.
+
+Root mode remains the default and behaves exactly as before.
+
 ## Exit codes and reports
 
 | Exit code | Meaning |

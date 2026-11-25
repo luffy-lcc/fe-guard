@@ -471,6 +471,63 @@ step('7. monorepo 跨包边界（不改用户 depcruise 配置）')
   )
 }
 
+// ================================================================ 8. package 级 baseline
+
+step('8. package 级 baseline：按包收紧、互不影响')
+{
+  const app = freshDir('package-baseline')
+  writeJson(path.join(app, 'package.json'), {
+    name: 'pkg-root',
+    private: true,
+    workspaces: ['apps/*'],
+  })
+  const fifteen = Array.from({ length: 15 }, (_, index) => `export const value${index} = ${index}`).join('\n')
+  for (const name of ['a', 'b']) {
+    writeJson(path.join(app, `apps/${name}/package.json`), { name: `pkg-${name}`, private: true })
+    writeText(path.join(app, `apps/${name}/src/index.ts`), `${fifteen}\n`)
+  }
+  configOnly(
+    app,
+    {
+      metrics: {
+        enabled: true,
+        roots: ['apps/a/src', 'apps/b/src'],
+        extensions: ['.ts'],
+        maxFileLines: 10,
+        maxFunctionLines: 1000,
+        maxAny: 1000,
+        duplication: { windowTokens: 50, minTokens: 100000, maxRatio: 1, ignore: [] },
+      },
+    },
+    { baseline: { strategy: 'package', packageFile: 'fe-guard.baseline.json' } },
+  )
+  initGit(app)
+
+  const ledger = (name) => path.join(app, `apps/${name}/fe-guard.baseline.json`)
+  const baseline = cli(app, ['baseline'])
+  check('package 模式 baseline 成功', baseline.code === 0, baseline.out + baseline.err)
+  check('每个 package 生成自己的账本', existsSync(ledger('a')) && existsSync(ledger('b')))
+  check('没有 package 条目时根账本不创建', !existsSync(baselineFileOf(app)))
+
+  const pass = cli(app, ['check'])
+  check('package 模式 check 通过', pass.code === 0, pass.out + pass.err)
+
+  const bBefore = readFileSync(ledger('b'), 'utf8')
+  writeText(path.join(app, 'apps/a/src/index.ts'), `${Array.from({ length: 5 }, (_, index) => `export const value${index} = ${index}`).join('\n')}\n`)
+  const tightened = cli(app, ['check'])
+  check('A 包收紧只改 A 账本', tightened.code === 0 && Object.keys(readJson(ledger('a')).ratchets ?? {}).length === 0, tightened.out)
+  check('B 账本逐字节不变', readFileSync(ledger('b'), 'utf8') === bBefore)
+
+  writeText(path.join(app, 'apps/a/src/index.ts'), `${Array.from({ length: 25 }, (_, index) => `export const value${index} = ${index}`).join('\n')}\n`)
+  const failed = cli(app, ['check'])
+  check('A 包新增违规时检查失败', failed.code === 1, failed.out)
+  check('B 账本仍逐字节不变', readFileSync(ledger('b'), 'utf8') === bBefore)
+
+  const show = cli(app, ['baseline', '--show', '--package', 'apps/a', '--json'])
+  const single = JSON.parse(show.out)
+  check('--show --package 指向 A 账本', show.code === 0 && single.path === 'apps/a/fe-guard.baseline.json', show.out)
+}
+
 // ================================================================ 汇总
 
 line('\n== 汇总 ==')

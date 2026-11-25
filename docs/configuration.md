@@ -86,7 +86,12 @@ Configuration is JSON, not YAML: zero dependencies (no hand-written YAML-subset 
       "ignore": ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "*.min.js", "dist/**", ".fe-guard/**", "fe-guard.baseline.json"]
     }
   },
-  "baseline": { "path": "fe-guard.baseline.json", "autoTighten": true },
+  "baseline": {
+    "path": "fe-guard.baseline.json",
+    "strategy": "root",
+    "packageFile": "fe-guard.baseline.json",
+    "autoTighten": true
+  },
   "report": { "path": ".fe-guard/report.json" },
   "feedback": { "path": ".fe-guard/false-positives.jsonl" },
   "diff": { "base": "HEAD" },
@@ -130,6 +135,8 @@ Configuration is JSON, not YAML: zero dependencies (no hand-written YAML-subset 
 | `checks.metrics.duplication.normalizeIdentifiers` | Default `false`. When enabled, non-keyword identifiers are normalized by first-appearance order, so copy-and-rename duplicates are caught too; the cost is hits on structurally similar but semantically different code — record those as false positives |
 | `checks.diff-size.maxFiles` / `maxLines` | Max changed files / added lines for this change; exceeding either fails |
 | `checks.diff-size.ignore` | Paths ignored in large-diff counting (lock files, build output, `.fe-guard/`, the baseline itself) |
+| `baseline.strategy` | `root` (default) keeps one repository-wide ledger and changes nothing for existing configs; `package` gives each workspace package its own ledger. `package` requires a detected workspace (`workspaces` / `pnpm-workspace.yaml` / `lerna.json`); single repos must keep `root` |
+| `baseline.packageFile` | Ledger filename used by package mode, relative to **each package directory** (default `fe-guard.baseline.json`, so `apps/web/fe-guard.baseline.json`). Absolute paths and `..` are rejected. Keep it inside a tracked directory — a ledger under a gitignored path won't be committed |
 | `baseline.autoTighten` | Default `true`: when `check` passes, fixed legacy violations are written back to the baseline (both the count and metric ledgers tighten). Set `false` in read-only environments |
 | `feedback.path` | Output path for false-positive records (JSONL). Append-only and auditable; `check` never reads it as an ignore list |
 | `report.path` | Report file path |
@@ -156,6 +163,8 @@ Do not put target files/directories in `args` (e.g. ESLint's `.`): fe-guard auto
 - **Root-level checks — deps / ui / metrics / boundaries — run only once**, but the default scan root `src` is automatically expanded to each sub-package's source directory.
 - Packages run **in parallel**; the report includes per-package timings, and stdout prints the total time per check.
 - If a package has a config but execution fails (e.g. the ESLint config itself throws), the check **fails outright and names the package** — never silently counted as passed.
+
+**Baseline can also be per package.** Set `"baseline": { "strategy": "package", "packageFile": "fe-guard.baseline.json" }` (package mode requires the workspace detection above). Root-level files stay in `baseline.path`; each package's files go to `<package>/<packageFile>`. For an existing repo, run `npx fe-guard baseline --migrate-packages` once to split the root ledger, commit the result, then run `npx fe-guard check`. `baseline --show` / `--verify` / `--trend` accept `--package <name|rel>`. Root mode remains the default. See [monorepo: per-package ledgers](baseline.md).
 
 To fall back to "run once at the repo root":
 

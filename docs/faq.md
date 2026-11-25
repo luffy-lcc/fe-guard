@@ -20,6 +20,21 @@ That's auto-tightening: you fixed legacy violations, so `check` lowered the allo
 **I want to accept a batch of new debt**
 `npx fe-guard baseline --widen` — it lists every `(file, rule)` pair about to be widened, one by one. Don't use it routinely.
 
+**How do I keep a baseline per package in a monorepo?**
+Set `"baseline": { "strategy": "package", "packageFile": "fe-guard.baseline.json" }`. Root-level files stay in `baseline.path`; each package gets `<package>/<packageFile>`. For an existing repo, preview with `npx fe-guard baseline --migrate-packages --dry-run`, apply with `--migrate-packages`, and commit the result; if `strategy` was still `root`, switch it to `package` afterwards. Root mode is the default and unchanged. Details: [monorepo: per-package ledgers](baseline.md).
+
+**Why does `check` fail when the root ledger still has package entries?**
+Because package mode would otherwise ignore them, silently unfreezing historical debt. The error names the offending files and asks you to run `npx fe-guard baseline --migrate-packages` first; no ledger is dropped automatically.
+
+**What if `--migrate-packages` reports a conflict?**
+The target package ledger already has the same `(file, rule)` key with a different count. The command exits 2 and writes nothing. Compare both values (for example with `baseline --show`), decide by hand which one is correct, adjust the ledger, then rerun the migration. Automatic merging would erase one side's history.
+
+**Why doesn't package mode support `--follow-renames`?**
+A rename can also change ownership (a file moving to another package), so the ledger split must be confirmed before keys are rewritten. Use root mode for rename migration, or move the entries by hand after checking `baseline --show`.
+
+**What happens if a package ledger is deleted?**
+`check` treats its files as new violations (exit 1), and `baseline --verify` fails with "the ledger was deleted, historical debt was silently unfrozen" as long as the base still has that ledger. Restore the file or migrate its entries explicitly; never delete a ledger to make a build green.
+
 **Upgraded ESLint / TS and suddenly a batch of new rule violations appears**
 Record them with `--widen` first (state the reason), then schedule cleanup separately; or downgrade the affected rules to `warn` for now.
 

@@ -78,7 +78,12 @@ export async function runCheck({ root, check, mode = 'full', config }) {
     mode,
     base: config?.diff?.base ?? 'HEAD',
     // baseline 是机器的账本，不是人写的改动；它变长不应该触发“大 diff”。
-    ignore: [...check.ignore, config?.baseline?.path ?? 'fe-guard.baseline.json'],
+    // package 模式每个 package 也有一本账，同样要排除。
+    ignore: [
+      ...check.ignore,
+      config?.baseline?.path ?? 'fe-guard.baseline.json',
+      config?.baseline?.packageFile ?? 'fe-guard.baseline.json',
+    ],
   })
   if (stats.error) {
     return [

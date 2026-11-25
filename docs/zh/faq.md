@@ -20,6 +20,21 @@
 **我想接受一批新欠债**
 `npx fe-guard baseline --widen`，它会逐条列出将要放宽的 `(文件, 规则)`。不要日常使用。
 
+**monorepo 怎么按 package 记 baseline？**
+配置 `"baseline": { "strategy": "package", "packageFile": "fe-guard.baseline.json" }`。根级文件仍留在 `baseline.path`，每个 package 写到 `<package>/<packageFile>`。老仓库先用 `npx fe-guard baseline --migrate-packages --dry-run` 预览，再执行 `--migrate-packages` 并提交结果；如果 `strategy` 还是 `root`，之后改成 `package`。root 模式仍是默认，行为不变。详见 [monorepo：package 级账本](baseline.md)。
+
+**为什么根账本还有 package 条目时 `check` 直接报错？**
+因为 package 模式若忽略这些条目，就等于静默解冻历史欠债。报错会列出涉及的文件，并提示先跑 `npx fe-guard baseline --migrate-packages`；不会自动丢掉任何账本。
+
+**`--migrate-packages` 报冲突怎么办？**
+目标 package 账本里已有同 `(文件, 规则)` 键、但计数不同。命令退出 2 且不写任何文件。先用 `baseline --show` 对照两边的值，人工确认哪一份是对的，修正账本后重新迁移。自动合并会抹掉另一边的历史。
+
+**为什么 package 模式不支持 `--follow-renames`？**
+重命名可能同时改变归属（文件被移到另一个 package），必须先确认账本拆分正确，才能改键。需要迁移重命名时回到 root 模式，或用 `baseline --show` 核对后人工搬条目。
+
+**package 账本被删了会怎样？**
+`check` 会把这些文件当成新增违规（退出码 1）；只要基线里还有这本账，`baseline --verify` 就会以「账本被删除，历史欠债被静默解冻」失败。请恢复文件或显式迁移条目，不要靠删账本让构建变绿。
+
 **升级了 ESLint / TS 版本，突然报了一批新规则违规**
 先用 `--widen` 记录下来（说明原因），再单独排期清理；或者把对应规则先降级为 `warn`。
 

@@ -40,17 +40,21 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
       一条命令查看：当前档位、每项检查覆盖到哪些 package、哪些被跳过、
       上次耗时、baseline 规模，以及哪些检查是“空的”
 
-  fe-guard baseline [--widen | --show [--by-rule] | --verify [--base <ref>] | --trend [--limit <n>]]
-                    [--all] [--json] [--config <file>] [--root <dir>]
+  fe-guard baseline [--widen | --show [--by-rule] | --verify [--base <ref>] | --trend [--limit <n>]
+                    | --migrate-packages [--dry-run]]
+                    [--package <name|rel>] [--all] [--json] [--config <file>] [--root <dir>]
       默认：把当前违规记录为 baseline（显式接受历史欠债）
         --widen       允许把已有条目的允许条数调大（默认拒绝）
-        --follow-renames  先把重命名文件的账本条目迁移到新路径（需先 git add，留审计）
+        --follow-renames  先把重命名文件的账本条目迁移到新路径（需先 git add，留审计；package 模式暂不支持）
         --show        查看存量；--by-rule 按规则聚合，按可清理条数排序
         --verify      对比 merge-base，未在 widenLog 登记的放宽直接失败
         --base <ref>  --verify 的比较基线；默认读 GITHUB_BASE_REF / GITHUB_BASE_SHA 或本地 upstream
         --all         --show 时展开全部文件（默认最多 20 个）
         --trend       只读 baseline 的 git 历史，展示存量随时间的变化（不写任何文件）
         --limit <n>   --trend 显示的版本数（默认 20）
+        --migrate-packages  把根账本里属于各 workspace package 的条目拆到 <package>/<packageFile>
+        --dry-run     只预览迁移计划，不写任何文件（只能与 --migrate-packages 一起用）
+        --package     只在 --show / --verify / --trend 时选定一个 package（仅 baseline.strategy="package"）
 
   fe-guard false-positive --file <文件> --rule <规则> --reason <原因> [--line <行>]
                           [--json] [--config <file>] [--root <dir>]
@@ -76,6 +80,8 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
   默认档位是 full，保证直接运行 check 与旧版本行为一致。
   git 钩子建议用 fast：npx fe-guard check --staged --profile fast
   --config / FE_GUARD_CONFIG 只影响配置读取，baseline 与报告路径仍按配置里的相对路径解析。
+  baseline.strategy="package" 时每个 workspace package 一本账本；先用 baseline --migrate-packages 拆账，
+  再用 --show / --verify / --trend --package <name|rel> 查看或校验单个 package。
 
 退出码:
   0  通过            1  存在新增违规 / 有检查未真正执行
@@ -95,8 +101,21 @@ const COMMANDS = {
   },
   doctor: { flags: ['--json', '--root', '-C'], values: ['--profile', '--config'], positionals: 0 },
   baseline: {
-    flags: ['--widen', '--show', '--by-rule', '--verify', '--follow-renames', '--all', '--json', '--trend', '--root', '-C'],
-    values: ['--base', '--config', '--limit'],
+    flags: [
+      '--widen',
+      '--show',
+      '--by-rule',
+      '--verify',
+      '--follow-renames',
+      '--all',
+      '--json',
+      '--trend',
+      '--migrate-packages',
+      '--dry-run',
+      '--root',
+      '-C',
+    ],
+    values: ['--base', '--config', '--limit', '--package'],
     positionals: 0,
   },
   'false-positive': {
@@ -260,6 +279,33 @@ async function runBaseline(flags, values, root) {
     const limit = Number(values.limit)
     if (!Number.isInteger(limit) || limit < 1) throw new UserError('--limit 需要正整数')
   }
+
+  const migratePackages = flags.has('--migrate-packages')
+  const dryRun = flags.has('--dry-run')
+  const packageName = values.package
+
+  if (packageName !== undefined && !['--show', '--verify', '--trend'].some((flag) => flags.has(flag))) {
+    throw new UserError('--package 只能与 --show / --verify / --trend 一起使用')
+  }
+  if (dryRun && !migratePackages) {
+    throw new UserError('--dry-run 只能与 --migrate-packages 一起使用')
+  }
+  if (migratePackages) {
+    const exclusive = ['--widen', '--show', '--verify', '--trend', '--follow-renames', '--by-rule', '--all']
+    if (
+      exclusive.some((flag) => flags.has(flag)) ||
+      values.package !== undefined ||
+      values.base !== undefined ||
+      values.limit !== undefined
+    ) {
+      throw new UserError(
+        '--migrate-packages 不能与 --widen / --show / --verify / --trend / --follow-renames / ' +
+          '--package / --base / --limit / --by-rule / --all 同时使用',
+      )
+    }
+    return baselineCommand({ root, configPath: values.config, migratePackages: true, dryRun })
+  }
+
   if (flags.has('--trend')) {
     const exclusive = ['--widen', '--show', '--by-rule', '--verify', '--follow-renames', '--all']
     if (values.base !== undefined || exclusive.some((flag) => flags.has(flag))) {
@@ -281,5 +327,8 @@ async function runBaseline(flags, values, root) {
     configPath: values.config,
     trend: flags.has('--trend'),
     limit: values.limit === undefined ? undefined : Number(values.limit),
+    packageName,
+    migratePackages: false,
+    dryRun: false,
   })
 }

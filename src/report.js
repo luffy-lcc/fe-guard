@@ -74,10 +74,12 @@ export function buildReport({
     })),
     baseline: {
       path: config.baseline.path,
+      strategy: config.baseline.strategy,
       autoTighten: config.baseline.autoTighten,
       tightened: evaluation?.tightened ?? [],
       removed: evaluation?.removed ?? [],
       wroteBack: Boolean(baselineStatus?.written),
+      ledgers: baselineStatus?.ledgers ?? [],
       current: baseline?.entries ?? {},
       ratchets: baseline?.ratchets ?? {},
     },
@@ -199,8 +201,16 @@ function baselineLines(report, { baselineChanged, baselineWritten }) {
       : `baseline 可收紧 ${tightened.length} 项（autoTighten=false，未写回）`
     lines.push(`${label}:`)
     tightened.forEach((item) => lines.push(`  ${item.file}  ${item.ruleId}  ${item.from} -> ${item.to}`))
-    if (report.baseline.wroteBack && tightened.some((item) => item.to > 0)) {
-      lines.push(`  已写回 ${report.baseline.path}`)
+    // package 模式下只要写过账本就显示写了几本；root 模式沿用「有新的允许值才提示写回」。
+    if (
+      report.baseline.wroteBack &&
+      (report.baseline.strategy === 'package' || tightened.some((item) => item.to > 0))
+    ) {
+      const target =
+        report.baseline.strategy === 'package'
+          ? `${(report.baseline.ledgers ?? []).filter((ledger) => ledger.written).length} 本 package 账本`
+          : report.baseline.path
+      lines.push(`  已写回 ${target}`)
     }
   } else if (baselineChanged && !baselineWritten) {
     lines.push('baseline 有变化但未写回（autoTighten=false）')

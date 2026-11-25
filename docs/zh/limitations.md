@@ -40,11 +40,18 @@
 - **全局 `enabled:false` 仍是显式紧急止血**。它会退出码 0 并写报告 `skipped: true`；但它也能让门禁变绿，所以只应作为临时手段。0 个启用项（没有全局关闭，但 `checks.*` 全关或整段缺失）会退出码 2。
 - **没有 HEAD 的仓库全档 `diff-size` 会失败**。新仓库在第一次 commit 之前，`check --full` 会报 `diff-size/not-executed`（退出码 1），因为它确实算不出本次改动规模；先完成一次初始提交，或临时关闭 `checks.diff-size`。
 - **`<check>/not-executed` 不可入账**。缺工具、超时、git 不可用、子进程崩溃都会产出它，`baseline` 永远不会吸收；但它不会阻止有人直接改 `enabled:false`——这需要评审兜底。
+- **package 模式暂不支持 `--follow-renames`**。重命名可能同时改变文件归属（文件从一个 package 移到另一个），必须先确认账本拆分正确；需要迁移重命名时回到 root 模式，或用 `--show` 核对后人工搬条目。
+- **`--migrate-packages` 的冲突不会自动合并**。目标 package 账本里已有同 key 不同值时，命令退出 2 且不写任何文件，必须人工判断哪一份是对的。
+- **根账本 stale 会直接报错**。package 模式下根账本里仍有 package 文件条目时，`check` / `baseline` 退出 2 并提示 `--migrate-packages`。这是有意的：静默丢掉这些条目等于把历史欠债悄悄解冻。
+- **package 归属按最长前缀判断**。把文件移到另一个 package 会被视为「旧条目删除 + 新条目新增」；`--follow-renames` 只在 root 模式提供，跨包移动需要人工迁移账本。
+- **`--verify` 不能判断账本是否覆盖了所有文件**。它只检查每本账是否仍存在、有没有被放宽；漏记的文件会在 `check` 里变成新增违规。
+- **`packageFile` 放在包内**。如果指向被 gitignore 的目录（如 `.fe-guard/`），账本不会提交，CI 看到的是一本空账——请放在被跟踪的目录。
+- **根账本仍管理根文件**。根包代码与仓库级脚本不会进入 package 账本，即使每个 workspace package 都有自己的账本。
 
 ## monorepo 与 Vue 的限制
 
 - **monorepo 的识别是约定式的**。目前认 `package.json` 的 `workspaces`（数组或 `{ packages }`）、`pnpm-workspace.yaml` 的 `packages:`、`lerna.json`；只展开 `apps/*`、`packages/**` 这类 glob，跳过 `!` 开头的排除项。不认 `rush.json`、Nx 的 `project.json`、Bazel 等自定义拓扑——这些仓库会退回单仓库模式。
-- **monorepo 下 deps / ui / metrics / boundaries 仍是根级一次**。它们会把默认扫描根 `src` 展开到各 package，但不是每个包独立记账；metrics 可用 `overrides` 按目录前缀给各包不同阈值，deps / ui 仍整仓库一套配置。
+- **monorepo 下 deps / ui / metrics / boundaries 仍是根级一次**。baseline 账本现在可以按 package 拆（`baseline.strategy: "package"`），但这些检查仍把默认扫描根 `src` 展开到各 package、整仓库一套配置，只是账本文件拆开。metrics 可用 `overrides` 按目录前缀给各包不同阈值，deps / ui 仍整仓库一套配置。
 - **monorepo 的 ESLint 耗时由项目自己的配置决定**。Repo B 的 5 个 package 并行仍要约 26s，因为两个 app 开了 type-aware 规则、扫 18 万行；fe-guard 的编排开销只有约 3s，不是瓶颈。
 - **没有 ESLint 配置的 package 会被跳过**，报告里会列出跳过名单（`--diff-only` / `--staged` 也会记录 `skipped`，不会整类静默消失）；包里有配置却执行失败时会带包名失败。
 - **没有 tsconfig 的 package 在 monorepo 下跳过**；如果根目录也没有 tsconfig 可跑，单仓库模式仍会报「找不到 tsconfig」。

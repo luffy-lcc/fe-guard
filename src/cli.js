@@ -59,9 +59,13 @@ const HELP = `fe-guard ${VERSION} — 把前端规范变成可执行检查（多
         --list        列出全部误报记录（含时间与原因）
         --suggest     按“规则 + 命中次数 + 误报率”给出降级/关闭建议（仍需人工决定）
 
-  fe-guard task [status|events|reset] [--json] [--summary] [--yes] [--root <dir>]
+  fe-guard task [status|events|reset|confirm|defer|stats] [<条件 id>] [--json] [--summary]
+                [--note <text>] [--reason <text>] [--yes] [--root <dir>]
       查看任务、验收条件与门禁证据；events 看事件流；reset 归档并清空任务
-        --summary     events 时输出聚合摘要（事件构成 / 门禁 / 拒绝 / 条件 / 交付）
+        --summary     events 时输出聚合摘要（事件构成 / 门禁 / 拒绝 / 条件 / 复盘 / 交付）
+        confirm       人工确认推断项（source 以 assumption 开头的条件），必须带 --note 与 --yes
+        defer         把条件明确放弃或转为上线待办，必须带 --reason 与 --yes
+        stats         只读聚合当前任务与归档（交付/降级、门禁失败率、top blocker、复盘与待办），--json 输出对象
 
   fe-guard mcp [--root <dir>]
       以 MCP stdio server 方式启动（给 Trae / Cursor 等 IDE 挂载）
@@ -100,7 +104,11 @@ const COMMANDS = {
     values: ['--file', '--rule', '--line', '--reason', '--config'],
     positionals: 0,
   },
-  task: { flags: ['--yes', '--json', '--summary', '--root', '-C'], positionals: 1 },
+  task: {
+    flags: ['--yes', '--json', '--summary', '--root', '-C'],
+    values: ['--note', '--reason'],
+    positionals: 2,
+  },
   mcp: { flags: ['--root', '-C'], positionals: 0 },
 }
 
@@ -209,9 +217,12 @@ async function dispatch({ command, flags, values, positionals }) {
     return taskCommand({
       root,
       action: positionals[0] ?? 'status',
+      criterionId: positionals[1],
       yes: flags.has('--yes'),
       json: flags.has('--json'),
       summary: flags.has('--summary'),
+      note: values.note,
+      reason: values.reason,
     })
   }
   if (command === 'mcp') {

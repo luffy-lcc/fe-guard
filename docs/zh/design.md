@@ -29,6 +29,18 @@ fe-guard 的想法很朴素：
 - **组件清单不常驻上下文**：清单落盘，AI 用 `ui_lookup` 按需查。常驻 token 换偶尔才用的信息不划算，而且清单会随项目增长、更新即过期。
 - **失败也要留下证据**：即使检查失败，报告、baseline 收紧和门禁证据也照常产出，便于复盘。
 
+## 流程层证据模型
+
+流程层把「做完了」拆成可核对的事实：
+
+- 验收条件必须写出处与类型；推断项由人确认，未确认不能交付。
+- 验收方式分 `gate` / `test` / `manual`：测试真跑，手工证据校验存在且非空并记录 sha256。
+- 每次门禁写快照（模式、退出码、完成度、违规指纹、预检结果）；失败门禁后必须复盘。
+- `completion` 分 covered / deferred / pending；待办与剩余条件都会出现在报告里。
+- 环境预检由项目自己的命令决定；失败即「本次检查未执行」。
+
+明确不做：视觉比稿 / 截图 diff、浏览器 / dev server / 登录态预检、规范分发与子代理编排、移动端真机。原因与触发条件见[路线图](roadmap.md)。
+
 ## 目录结构
 
 ```
@@ -58,11 +70,14 @@ fe-guard/
 │   ├── html.js                  单文件 HTML 报告（内联 CSS/JS，零外部资源）
 │   ├── version.js               工具版本，SARIF / HTML / --version 共用
 │   ├── commands/                init / check / baseline / feedback / doctor / task
-│   ├── workflow/                state.js（事件流/阶段推导）/ tools.js（7 个 MCP 工具）/ tests.js（条件测试）
+│   ├── workflow/                流程核心：state.js（事件/阶段）/ definitions.js（工具 schema）/
+│   │                            criteria.js（type/source/verify）/ evidence.js（快照与指纹）/
+│   │                            gate.js / preflight.js / lessons.js / statistics.js / settings.js /
+│   │                            errors.js / tools.js（handler 注册与复用）/ tests.js（条件测试）
 │   ├── mcp/server.js            极简 MCP stdio server（零依赖，换行分隔 JSON-RPC）
 │   ├── ide/                     source.js（产物唯一事实源）/ tokens.js / artifacts.js（受管文件 + 5 个 MCP 客户端配置）
 │   └── runners/                 index.js + eslint / typescript / boundaries / deps / ui / metrics / diff-size
-├── test/                        单测 + v5/v6/v6.1/v6.2/v6.3 端到端 + init 探测 / 预设 / MCP 客户端 / SARIF / HTML / ESLint 消息分类 / 趋势 / 任务摘要 / React-TSX / 跨包边界
+├── test/                        单测 + v5/v6/v6.1/v6.2/v6.3 端到端 + init 探测 / 预设 / MCP 客户端 / SARIF / HTML / ESLint 消息分类 / 趋势 / 任务摘要 / React-TSX / 跨包边界 / 工作流合同 / 门禁证据 / confirm 与 defer / 预检 / 复盘 / 统计
 ├── examples/sample-app/         带存量违规的样例工程（真实三件套）
 ├── examples/husky-pre-commit    提交前钩子示例（fast 档）
 ├── verify.sh                    v1 一键真实验证（检查 + 棘轮）
@@ -72,7 +87,7 @@ fe-guard/
 └── verify-ts7.mjs               TypeScript 7 冒烟验证（非 Vue：真实 tsc 7 的诊断仍能解析）
 ```
 
-停两个月再回来，只需要看四个地方：`src/baseline.js`（棘轮语义）、`src/workflow/state.js`（阶段怎么推导）、`src/workflow/tools.js`（哪些操作会被拒）、`src/runners/*`（工具适配）。每个文件都控制在 500 行内（自检同款约束）。
+停两个月再回来，只需要看四个地方：`src/baseline.js`（棘轮语义）、`src/workflow/state.js`（阶段怎么推导）、`src/workflow/gate.js`（哪些操作会被拒）、`src/runners/*`（工具适配）。每个文件都控制在 500 行内（自检同款约束）。
 
 ## 验证体系
 
@@ -87,6 +102,6 @@ npm run verify:ts7     # TS 7 冒烟：真实 typescript@7 的诊断仍能解析
 npm run self-check     # 用 fe-guard 的 fast 档检查自己
 ```
 
-所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 113 项、v3 83 项、v4 60 项全部通过；`npm test` 147 项通过（含 v6.1 的 17 项、v6.2 的 5 项、v6.3 的 5 项、init 探测的 5 项、init 预设与 `--dry-run` 的 10 项、多客户端 MCP 的 6 项、SARIF 的 6 项、HTML 报告的 6 项、ESLint 消息分类的 5 项、趋势与任务摘要的 6 项、React/TSX 验证的 3 项、跨包边界的 6 项）。
+所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 135 项、v3 83 项、v4 60 项全部通过；`npm test` 174 项通过，包含工作流合同（结构化条件、confirm / defer）、手工证据与门禁快照、预检、返工对比、复盘 / distill 与 `task stats`。
 
 任何一个环节不符合预期，脚本会打印期望值、实际值和完整输出，并以退出码 1 结束。贡献指南见 [CONTRIBUTING](../../CONTRIBUTING.md)。

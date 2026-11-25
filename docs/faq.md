@@ -39,7 +39,22 @@ If the log only shows "config loaded / server added" with no connection record, 
 That's expected: without a task, the workflow won't let it write a plan or run the gate. Just state the requirement clearly — it should call `task_start` on its own.
 
 **The task is stuck at verify**
-Run `npx fe-guard task` to see the blockers, fix them, then have the AI call `task_gate` again; `npx fe-guard task events` shows the full timeline.
+Run `npx fe-guard task` to see the blockers, fix them, then have the AI call `task_gate` again; `npx fe-guard task events` shows the full timeline. Blockers can include unconfirmed `assumption` criteria (human `task confirm`), missing manual evidence, or a missing lesson after a failed gate (`task_lesson`).
+
+**Why do criteria need `type` and `source`?**
+A plain text list lets a task look complete while whole categories are missing, and makes "where did this come from" unanswerable. `type` forces a check for interaction / data / tracking / compat / performance criteria, and `source: assumption: ...` marks guesses that a human must confirm before delivery.
+
+**Why are `confirm` / `defer` CLI-only?**
+They are human decisions: confirming an assumption or accepting a release todo changes what "done" means. As MCP tools the model could approve itself. The CLI requires `--note` / `--reason` and `--yes`, and leaves an auditable event in the task stream.
+
+**What should the preflight command do? What if it fails?**
+Put whatever must be true before verification is meaningful — for example `npm run check:env` verifying a local API, generated types or required environment variables. If it fails, `task_start` creates no task and `task_gate` reports "this check was not executed" (no evidence, criteria not covered). fe-guard never starts your dev server or logs in for you.
+
+**Why can't I deliver after a failed gate? How do I turn it off?**
+`workflow.distill` defaults to `enforce`: after the last failed gate, a `task_lesson` (text + evidence + scope) is required. Set it to `warn` to allow delivery marked `degraded`, or `off` to disable the requirement. Don't write a fake lesson just to pass.
+
+**Where does `task stats` data come from?**
+It replays the event stream of the current `.fe-guard/task.json` plus `.fe-guard/tasks/*.json` archives. It is read-only and writes nothing; corrupt archive files are skipped and counted, and deleting an archive removes it from future stats.
 
 **Want to skip the workflow temporarily for an urgent fix**
 Set `workflow.enabled` to `false` in `fe-guard.config.json` (checks only), or run `npx fe-guard check` yourself. Don't edit the baseline to "manufacture a pass".

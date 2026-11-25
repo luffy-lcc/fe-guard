@@ -175,6 +175,22 @@ npx fe-guard false-positive --suggest   # per-rule suggestions to downgrade/disa
 
 Records are written to `.fe-guard/false-positives.jsonl` — append-only, never rewritten, auditable. The boundary must be clear: **marking a false positive does not make `check` ignore the violation**; it is only evidence. To downgrade, change `level`; to disable, change `enabled` — and go through review.
 
+## 8. Acceptance criteria and evidence
+
+When you drive a task through the MCP workflow, each criterion is structured:
+
+```json
+{ "text": "empty state shows 0 items", "type": "ui", "source": "design/spec-v3#empty" }
+```
+
+- `type` is one of `ui` / `interaction` / `data` / `tracking` / `compat` / `performance`; `source` records where it came from. A guess becomes `source: "assumption: <reason>"`.
+- An `assumption` criterion needs a human: `npx fe-guard task confirm C2 --note "..." --yes`. Unconfirmed assumptions block delivery.
+- Prefer `testFile` when the criterion can be tested. Otherwise `verify: "manual"` needs an `evidenceFile` (screenshot notes, reconciliation record); the gate checks it exists and is non-empty and records bytes + sha256.
+- After a failed gate, record a retrospective with `task_lesson` (text + evidence + scope). `workflow.distill` defaults to `enforce`, so delivery waits for it; use `warn` / `off` only deliberately.
+- Progress is reported as "N done / M deferred" (plus remaining). Deferred criteria mark the delivery `degraded`; the tools never say "all done".
+
+`npx fe-guard task stats` gives a read-only view of delivery / degraded tasks, gate failure rate, average gates, top blockers, lessons and deferred criteria across the current task and archives.
+
 ## Common commands
 
 ```bash
@@ -210,6 +226,9 @@ npx fe-guard false-positive --list / --summary / --suggest
 npx fe-guard task                 # current task, acceptance criteria and gate evidence
 npx fe-guard task events          # event stream (audit what the AI did and tried to bypass)
 npx fe-guard task reset --yes     # archive the current task and clear it (archived to .fe-guard/tasks/)
+npx fe-guard task stats           # read-only delivery / gate / lesson stats across the current task and archives
+npx fe-guard task confirm C2 --note "..." --yes   # confirm an assumption criterion
+npx fe-guard task defer C3 --reason "..." --yes   # turn a criterion into a release todo
 npx fe-guard mcp                  # start as an MCP stdio server (what the IDE mounts)
 
 npx fe-guard check --root ../app  # specify the project root (defaults to the current directory)
@@ -372,21 +391,21 @@ npm i -D fe-guard --registry https://npm.internal.example.com
 npx fe-guard --version
 ```
 
-Upgrade: `npm i -D fe-guard@0.3.0`. Rollback: `npm i -D fe-guard@0.2.0`. Commit `package-lock.json` in the project so everyone installs the same version.
+Upgrade: `npm i -D fe-guard@0.4.0`. Rollback: `npm i -D fe-guard@0.3.0`. Commit `package-lock.json` in the project so everyone installs the same version.
 
 ### Route B: install the tarball directly (works without a registry)
 
 ```sh
 # on the maintainer's machine
-npm pack                      # produces fe-guard-0.3.0.tgz
+npm pack                      # produces fe-guard-0.4.0.tgz
 # send the tgz to consumers via intranet file share / scp / shared directory
 
 # consuming project
-npm i -D ./fe-guard-0.3.0.tgz
+npm i -D ./fe-guard-0.4.0.tgz
 npx fe-guard --version
 ```
 
-Upgrade: once you have the new tgz, `npm i -D ./fe-guard-0.3.0.tgz`. Rollback: `npm i -D ./fe-guard-0.2.0.tgz` (just keep the old tgz in the shared directory).
+Upgrade: once you have the new tgz, `npm i -D ./fe-guard-0.4.0.tgz`. Rollback: `npm i -D ./fe-guard-0.3.0.tgz` (just keep the old tgz in the shared directory).
 
 `npm pack` includes only `bin/`, `src/`, `examples/`, `README.md`, `README.zh-CN.md`, `LICENSE`, `CHANGELOG.md` — no tests or verification scripts. npm restores the executable bit on `bin` automatically, so `npx fe-guard` runs directly after install.
 

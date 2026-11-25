@@ -39,7 +39,22 @@ dependency-cruiser 的 JSON 不提供行号，只有「谁依赖了谁」。ESLi
 这是预期的：没有任务时流程不会允许它写计划或跑门禁。直接把需求讲清楚即可，它应该自己调用 `task_start`。
 
 **任务卡在 verify**
-`npx fe-guard task` 看阻塞项，按 blockers 修完再让 AI 调一次 `task_gate`；`npx fe-guard task events` 能看到完整的时间线。
+`npx fe-guard task` 看阻塞项，按 blockers 修完再让 AI 调一次 `task_gate`；`npx fe-guard task events` 能看到完整的时间线。阻塞项可能是未确认的 `assumption` 条件（需人工 `task confirm`）、缺失的手工证据，或失败门禁后还没写复盘（`task_lesson`）。
+
+**为什么条件要 `type` 和 `source`？**
+只有一段文字时，任务很容易「看起来做完了」却漏掉整类条件，也回答不了「这条从哪来」。`type` 逼着检查交互 / 数据 / 埋点 / 兼容 / 性能类条件；`source: assumption: ...` 标记推断项，交付前必须由人确认。
+
+**confirm / defer 为什么只能 CLI？**
+它们是人的决定：确认推断项、接受上线待办，都会改变「做完」的定义。做成 MCP 工具等于让模型自己批准。CLI 强制 `--note` / `--reason` 与 `--yes`，并在任务事件流里留下可审计记录。
+
+**preflight 命令写什么？失败怎么办？**
+写「不满足就不能相信后续验证」的前置条件，例如 `npm run check:env` 检查本地接口、生成类型或必需环境变量。失败时 `task_start` 不创建任务，`task_gate` 报「本次检查未执行」（不产证据、条件不被覆盖）。fe-guard 不会替你启动 dev server 或登录。
+
+**失败门禁后为什么不能交付？怎么关闭？**
+`workflow.distill` 默认 `enforce`：最近一次失败门禁之后必须写 `task_lesson`（结论 + 证据 + scope）。改成 `warn` 可交付但标记 `degraded`，改成 `off` 则关闭要求。不要为了过门禁编一条假复盘。
+
+**task stats 的数据从哪来？**
+它重放当前 `.fe-guard/task.json` 与 `.fe-guard/tasks/*.json` 归档里的事件流。只读、不写任何文件；损坏的归档会跳过并计数，删除归档后不再计入。
 
 **想临时跳过流程做一次紧急修改**
 把 `fe-guard.config.json` 里 `workflow.enabled` 设为 `false`（只剩门禁），或者自己跑 `npx fe-guard check`。不要改 baseline 来“制造通过”。

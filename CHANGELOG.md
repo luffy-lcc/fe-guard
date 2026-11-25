@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0]
 
 ### Added
 
@@ -18,6 +18,57 @@ All notable changes to this project are documented here. The format is based on
   config generation, `init` wiring and invalid values; the v4 verification runs a real
   dependency-cruiser over a two-package workspace (cross import caught, intra-package and
   package entry imports allowed).
+- **Structured acceptance criteria.** `task_criteria` now requires `type`
+  (`ui` / `interaction` / `data` / `tracking` / `compat` / `performance`) and `source` on
+  every criterion, with optional `verify` (`gate` / `test` / `manual`) plus `testFile` /
+  `evidenceFile`. `verify` defaults from the provided fields, conflicting combinations are
+  rejected, and an all-`ui` contract returns a warning instead of blocking.
+- **Human confirmation and release todos.** `npx fe-guard task confirm <id> --note "..."`
+  records `criterion.confirmed` for `assumption` criteria (must be after the criterion was
+  declared); `npx fe-guard task defer <id> --reason "..."` records `criterion.deferred`.
+  Delivery continues but is marked `degraded`, and completion lists deferred criteria
+  separately. Neither command exists as an MCP tool.
+- **Evidence instead of claims.** Every gate writes
+  `.fe-guard/evidence/<taskId>/<evidenceId>.json`; `task_gate` returns `evidencePath` and
+  `task_status` exposes `lastEvidencePath`. `verify: manual` records `{ file, bytes, sha256 }`
+  and blocks on a missing or empty file. Responses include
+  `completion: { achieved, total, remaining, deferred }` and report "N done / M deferred" —
+  never "all done".
+- **Environment preflight.** `workflow.preflight: { command, timeoutMs }` (empty command =
+  off) runs before `task_start` (failure creates no task) and before every gate (failure is
+  recorded as `preflight.failed` and the check is reported as "not executed").
+- **Rework diff.** Gate evidence stores violation fingerprints (capped at 100) and returns
+  `trend: { previousNew, fixed, introduced }`; new violations after a failed run add a
+  regression blocker.
+- **Retrospectives.** The 8th MCP tool `task_lesson` (text / evidence / scope) appends to
+  `.fe-guard/lessons.jsonl`; `workflow.distill` defaults to `enforce`, blocks delivery until
+  a lesson is recorded after the last failed gate, and supports `warn` / `off`.
+- **Workflow effect stats.** Read-only `fe-guard task stats [--json]` aggregates the current
+  task plus `.fe-guard/tasks/` archives: delivered / degraded / active, gate failure rate,
+  average gates per task, top blockers, lessons and deferred criteria.
+- Tests cover structured criteria, confirm / defer, manual evidence and snapshots, preflight
+  (pass / fail / timeout), rework diff, lessons / distill and stats; `npm test` passes 174
+  and `verify-v2.mjs` reaches 135 checks (including preflight + snapshot + lesson delivery).
+
+### Changed
+
+- Tool count is 8: 7 `task_*` (`start` / `criteria` / `plan` / `next` / `gate` / `status` /
+  `lesson`) plus `ui_lookup`.
+- **AGENTS.md snippet and Trae / Cursor rules** now state the hard rules: criteria need
+  `type` + `source`, assumptions need a human `task confirm`, failed gates need
+  `task_lesson`, only "N done / M deferred" may be reported, and a preflight failure means
+  the check did not execute. The snippet stays under the 600-token cap (~591 measured).
+- Slash commands now point at blockers (regression, unconfirmed assumptions, missing manual
+  evidence, required lesson) and remind the model that `confirm` / `defer` are CLI-only.
+- New config fields: `workflow.preflight` and `workflow.distill`; invalid values exit with
+  code 2 like the other config errors. `distill` defaults to `enforce`, so a task with a
+  failed gate now needs a `task_lesson` before delivery — set it to `warn` or `off` to opt out.
+
+### BREAKING
+
+- **`task_criteria` requires `type` and `source`.** Any MCP client or script calling the tool
+  with `{ text }` only will be rejected. Historical `task.json` events still replay — missing
+  fields are shown as `unknown` / empty arrays — but new declarations are strictly validated.
 
 ### Fixed
 

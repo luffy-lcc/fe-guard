@@ -108,7 +108,7 @@ const failingTest = "import { test } from 'node:test'\nimport assert from 'node:
 
 async function startTaskWithTest(root) {
   await callTool({ root, name: 'task_start', args: { title: 'add', goal: 'add 正确' } })
-  await callTool({ root, name: 'task_criteria', args: { criteria: [{ text: 'add(1,2)=3', testFile: 'test/add.test.mjs' }] } })
+  await callTool({ root, name: 'task_criteria', args: { criteria: [{ text: 'add(1,2)=3', type: 'data', source: '需求：add 正确', testFile: 'test/add.test.mjs' }] } })
   await callTool({ root, name: 'task_plan', args: { steps: ['实现 add', '写测试'] } })
 }
 
@@ -168,7 +168,11 @@ test('端到端：非法 testFile 被拒绝且不写入条件', async () => {
   try {
     await callTool({ root, name: 'task_start', args: { title: 't', goal: 'g' } })
     await assert.rejects(
-      () => callTool({ root, name: 'task_criteria', args: { criteria: [{ text: 'x', testFile: '../evil.mjs' }] } }),
+      () => callTool({
+        root,
+        name: 'task_criteria',
+        args: { criteria: [{ text: 'x', type: 'data', source: '需求：非法路径', testFile: '../evil.mjs' }] },
+      }),
       /testFile/,
     )
     const status = await callTool({ root, name: 'task_status' })

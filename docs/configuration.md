@@ -93,7 +93,9 @@ Configuration is JSON, not YAML: zero dependencies (no hand-written YAML-subset 
   "workflow": {
     "enabled": true,
     "gate": { "mode": "full", "testCommand": "node --test", "testTimeoutMs": 120000 },
-    "stages": { "contract": "enforce", "plan": "enforce", "verify": "enforce" }
+    "stages": { "contract": "enforce", "plan": "enforce", "verify": "enforce" },
+    "preflight": { "command": "", "timeoutMs": 60000 },
+    "distill": "enforce"
   }
 }
 ```
@@ -132,7 +134,11 @@ Configuration is JSON, not YAML: zero dependencies (no hand-written YAML-subset 
 | `feedback.path` | Output path for false-positive records (JSONL). Append-only and auditable; `check` never reads it as an ignore list |
 | `report.path` | Report file path |
 | `diff.base` | Comparison base for `--diff-only` and large-diff counting; can be changed to e.g. `origin/main` |
+| `workflow.preflight` | `{ command, timeoutMs }` environment preflight. Empty `command` (default) = off. When set, a failure makes `task_start` create no task and makes `task_gate` report "this check was not executed" — no evidence, criteria not covered. `timeoutMs` defaults to 60000 |
+| `workflow.distill` | `enforce` (default) / `warn` / `off`. With `enforce`, a task cannot be delivered until a `task_lesson` is recorded after the last failed gate; `warn` allows delivery but marks it `degraded`; `off` disables the requirement |
 | `workflow.*` | Workflow-layer switches; see [Workflow switches](workflow.md#switches) |
+
+Acceptance-criterion fields (`type` / `source` / `verify` / `testFile` / `evidenceFile`) belong to the task contract, not this config file; see [Acceptance criteria](workflow.md#acceptance-criteria-type-source-verification).
 
 Do not put target files/directories in `args` (e.g. ESLint's `.`): fe-guard automatically appends the full targets or the changed-file list at the end.
 

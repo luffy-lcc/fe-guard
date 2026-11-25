@@ -24,6 +24,10 @@ fe-guard does one thing: make "**no worse than before**" automatic. Legacy debt 
 - **Seven checks**: ESLint / TypeScript / architecture boundaries (orchestrating external tools) + dependency guard / component inventory / rot metrics / large-diff (built-in, lightweight).
 - **Dual-track baseline ratchet**: counts + metric maxima, only tightens, auditable via `firstSeen` / `widenLog`.
 - **MCP workflow layer**: event-sourced, stages derived from events, the AI cannot self-report "passed"; criteria can bind a test that the gate really runs.
+- **Structured contract with human gates**: every criterion needs `type` (ui / interaction / data / tracking / compat / performance) + `source`; `assumption` items must be confirmed by a human (`task confirm`), and a human can turn criteria into `deferred` release todos (`task defer`) — delivery is then marked `degraded` and reported as "N done / M deferred", never "all done".
+- **Evidence instead of claims**: every gate writes a snapshot to `.fe-guard/evidence/<taskId>/<evidenceId>.json`; `verify: manual` evidence is hashed (bytes + sha256); `completion` exposes `achieved / total / remaining / deferred`.
+- **Preflight, rework and retrospectives**: `workflow.preflight.command` refuses to start a task when the environment is broken and never lets a gate pass without executing; gate fingerprints return `fixed` / `introduced`; `task_lesson` + `workflow.distill` require a lesson after a failed gate.
+- **Effect stats**: read-only `fe-guard task stats [--json]` aggregates delivery / degraded, gate failure rate, average gates per task, top blockers, lessons and deferred criteria.
 - **fast / full profiles**: hooks under 3 seconds, full profile manually before merge.
 - **Honest engineering**: a check that didn't run reports `not-executed` (non-baselineable); skipped ≠ passed; never a false green.
 - **Shareable output**: `check --format sarif` feeds GitHub Code Scanning (new violations + `not-executed` only, so legacy debt doesn't flood the alerts page); `check --format html` writes a single self-contained report with zero external assets.
@@ -36,6 +40,7 @@ npm i -D fe-guard          # before npm publish: npm i -D github:luffy-lcc/fe-gu
 npx fe-guard init          # probe the project, then write config / ledger / AGENTS.md / IDE artifacts
 npx fe-guard baseline      # record existing violations once (check turns green)
 npx fe-guard check         # blocks only new violations; fixing old ones auto-tightens
+npx fe-guard task stats    # after AI-driven tasks: read-only delivery / gate / lesson stats
 # .husky/pre-commit:
 npx fe-guard check --staged --profile fast
 ```
@@ -52,7 +57,7 @@ Adopting into a legacy codebase? `npx fe-guard init --preset legacy --dry-run` p
 { "mcpServers": { "fe-guard": { "command": "node", "args": ["./node_modules/fe-guard/bin/fe-guard-mcp.js"] } } }
 ```
 
-The AI gets 6 `task_*` tools + `ui_lookup` and must call them to advance through contract → criteria → plan → implement → verify → deliver. Stage decisions live in code, so it cannot self-report "passed". On macOS, GUI apps don't load the shell PATH — with nvm/fnm, use absolute paths for `command`/`args` ([FAQ](docs/faq.md)).
+The AI gets 7 `task_*` tools + `ui_lookup` and must call them to advance through contract → criteria → plan → implement → verify → deliver. Stage decisions live in code, so it cannot self-report "passed". On macOS, GUI apps don't load the shell PATH — with nvm/fnm, use absolute paths for `command`/`args` ([FAQ](docs/faq.md)).
 
 Full walkthrough: [workflow](docs/workflow.md).
 
@@ -69,6 +74,7 @@ Full walkthrough: [workflow](docs/workflow.md).
 | FAQ and troubleshooting | [faq](docs/faq.md) |
 | Known limitations and non-goals | [limitations](docs/limitations.md) |
 | Design trade-offs and architecture | [design](docs/design.md) |
+| Roadmap | [roadmap](docs/roadmap.md) |
 | Real-world measurement report | [real-world](docs/real-world.md) |
 
 Chinese documentation: [README.zh-CN.md](./README.zh-CN.md) · [docs/zh/](docs/zh/).

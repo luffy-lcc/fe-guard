@@ -223,8 +223,8 @@ async function happyPath() {
     // v3 新增了 ui_lookup（组件清单按需查询），工具上限从 6 放宽到 8。
     check(`工具数量 ≤ 8（实际 ${names.length}）`, names.length <= 8, names.join(', '))
     check(
-      '覆盖 合同/条件/计划/下一步/门禁/状态',
-      ['task_start', 'task_criteria', 'task_plan', 'task_next', 'task_gate', 'task_status'].every((name) =>
+      '覆盖 合同/条件/计划/下一步/门禁/状态/复盘',
+      ['task_start', 'task_criteria', 'task_plan', 'task_next', 'task_gate', 'task_status', 'task_lesson'].every((name) =>
         names.includes(name),
       ),
       names.join(', '),
@@ -247,7 +247,10 @@ async function happyPath() {
     check('task_start 返回 taskId', started.value?.ok === true && /^T-/.test(started.value.taskId), started.text)
 
     const criteria = await mcp.call('task_criteria', {
-      criteria: [{ text: 'formatDuration(1000) 返回 "1s"' }, { text: 'fe-guard 全量检查通过' }],
+      criteria: [
+        { text: 'formatDuration(1000) 返回 "1s"', type: 'data', source: '需求：新增 formatDuration' },
+        { text: 'fe-guard 全量检查通过', type: 'compat', source: '仓库约定：交付前跑全量检查' },
+      ],
     })
     check('验收条件自动编号 C1/C2', JSON.stringify(criteria.value?.ids) === '["C1","C2"]', criteria.text)
     check('写条件后阶段为 plan', criteria.value?.stage === 'plan', criteria.text)
@@ -330,7 +333,9 @@ async function rejections() {
     const gateFirst = await mcp.call('task_gate')
     check('无任务时 task_gate 被拒绝', gateFirst.isError && /task_start/.test(gateFirst.text), gateFirst.text)
 
-    const criteriaFirst = await mcp.call('task_criteria', { criteria: [{ text: 'x' }] })
+    const criteriaFirst = await mcp.call('task_criteria', {
+      criteria: [{ text: 'x', type: 'ui', source: 'assumption: 无任务' }],
+    })
     check('无任务时 task_criteria 被拒绝', criteriaFirst.isError && /task_start/.test(criteriaFirst.text), criteriaFirst.text)
 
     await mcp.call('task_start', { title: '反例验证', goal: '确认流程不能被绕过' })
@@ -341,7 +346,9 @@ async function rejections() {
     const gateNoPlan = await mcp.call('task_gate')
     check('没有计划时 task_gate 被拒绝', gateNoPlan.isError && /计划/.test(gateNoPlan.text), gateNoPlan.text)
 
-    const selfReport = await mcp.call('task_criteria', { criteria: [{ text: '看起来已经做完了', achieved: true }] })
+    const selfReport = await mcp.call('task_criteria', {
+      criteria: [{ text: '看起来已经做完了', type: 'ui', source: 'assumption: 模型自报', achieved: true }],
+    })
     check(
       '验收条件带 achieved 字段被拒绝（不能自报达成）',
       selfReport.isError && /不能自行标记/.test(selfReport.text),
@@ -351,7 +358,9 @@ async function rejections() {
     const forceStatus = await mcp.call('task_status', { status: 'delivered' })
     check('task_status 不接受 status 参数', forceStatus.isError, forceStatus.text)
 
-    const criteriaOk = await mcp.call('task_criteria', { criteria: [{ text: 'fe-guard 全量检查通过' }] })
+    const criteriaOk = await mcp.call('task_criteria', {
+      criteria: [{ text: 'fe-guard 全量检查通过', type: 'compat', source: '仓库约定：交付前跑全量检查' }],
+    })
     check('合法条件可以写入', criteriaOk.value?.ok === true, criteriaOk.text)
 
     const restart = await mcp.call('task_start', { title: '再来一个', goal: '绕过当前任务' })
@@ -373,6 +382,7 @@ async function rejections() {
     check('门禁未通过时停在 verify', gateFail.value?.stage === 'verify', gateFail.text)
     check('门禁未通过时条件达成数为 0', gateFail.value?.criteria?.achieved === 0, gateFail.text)
     check('返回的 blockers 指到具体文件与规则', Array.isArray(gateFail.value?.blockers) && gateFail.value.blockers.length > 0, gateFail.text)
+    check('失败门禁要求复盘（distill 默认 enforce）', gateFail.value?.lessonRequired === true, gateFail.text)
 
     const statusAfterFail = await mcp.call('task_status')
     check(
@@ -385,9 +395,20 @@ async function rejections() {
     const nextAfterFail = await mcp.call('task_next')
     check('task_next 给出阻塞原因', (nextAfterFail.value?.blockers ?? []).length > 0, nextAfterFail.text)
 
+    const lesson = await mcp.call('task_lesson', {
+      text: '修复前先跑门禁定位违规文件，避免凭印象改代码',
+      evidence: `${gateFail.value?.evidenceId ?? 'E1'} 记录了 bad.ts 的显式 any`,
+      scope: 'rule',
+    })
+    check('task_lesson 记录复盘', lesson.value?.ok === true && lesson.value?.lessonId === 'L1', lesson.text)
+
     rmSync(path.join(app, 'src/utils/bad.ts'))
     const gateOk = await mcp.call('task_gate')
-    check('修复后重跑门禁通过并交付', gateOk.value?.ok === true && gateOk.value?.stage === 'deliver', gateOk.text)
+    check('修复并复盘后重跑门禁通过并交付', gateOk.value?.ok === true && gateOk.value?.stage === 'deliver', gateOk.text)
+    check('第二轮返回返工对比 trend', (gateOk.value?.trend?.fixed ?? 0) >= 1, gateOk.text)
+
+    const statusAfterFix = await mcp.call('task_status')
+    check('task_status 可见复盘', (statusAfterFix.value?.lessons ?? []).length === 1, statusAfterFix.text)
 
     const task = readJson(taskFileOf(app))
     const rejected = task.events.filter((event) => event.type === 'tool.rejected')
@@ -431,7 +452,9 @@ async function legacyProject() {
   try {
     await handshake(mcp)
     await mcp.call('task_start', { title: '修复 math.ts 新增违规', goal: '同一文件不再产生新增违规' })
-    await mcp.call('task_criteria', { criteria: [{ text: 'fe-guard 不再报新增违规' }] })
+    await mcp.call('task_criteria', {
+      criteria: [{ text: 'fe-guard 不再报新增违规', type: 'compat', source: '仓库约定：baseline 只紧不松' }],
+    })
     await mcp.call('task_plan', { steps: ['修复 eqeqeq', '移除 any', '跑门禁'] })
 
     const gateFail = await mcp.call('task_gate')
@@ -442,6 +465,13 @@ async function legacyProject() {
     )
     check('门禁失败时 baseline 条目数不变（仍 3）', baselineKeyCount(app) === 3, String(baselineKeyCount(app)))
     check('门禁失败后停在 verify', gateFail.value?.stage === 'verify', gateFail.text)
+
+    const lesson = await mcp.call('task_lesson', {
+      text: '存量文件修复也要先跑门禁，按规则逐条核对',
+      evidence: `${gateFail.value?.evidenceId ?? 'E1'} 记录 math.ts 新增 1 条违规`,
+      scope: 'rule',
+    })
+    check('失败后先复盘', lesson.value?.ok === true, lesson.text)
 
     writeFileSync(
       math,
@@ -595,13 +625,20 @@ async function testFileBinding() {
     await handshake(mcp)
     await mcp.call('task_start', { title: '时长工具', goal: 'formatDuration 正确且有测试覆盖' })
 
-    const escape = await mcp.call('task_criteria', { criteria: [{ text: '逃出仓库', testFile: '../outside.test.mjs' }] })
+    const escape = await mcp.call('task_criteria', {
+      criteria: [{ text: '逃出仓库', type: 'ui', source: 'assumption: 无', testFile: '../outside.test.mjs' }],
+    })
     check('testFile 带 .. 被拒绝', escape.isError && /testFile/.test(escape.text), escape.text)
 
     const criteria = await mcp.call('task_criteria', {
       criteria: [
-        { text: 'formatDuration(1000) 返回 "1s"', testFile: 'test/duration.test.mjs' },
-        { text: 'fe-guard 全量检查通过' },
+        {
+          text: 'formatDuration(1000) 返回 "1s"',
+          type: 'data',
+          source: '需求：新增 formatDuration',
+          testFile: 'test/duration.test.mjs',
+        },
+        { text: 'fe-guard 全量检查通过', type: 'compat', source: '仓库约定：交付前跑全量检查' },
       ],
     })
     check('挂 testFile 的条件被接受', criteria.value?.ok === true, criteria.text)
@@ -811,6 +848,107 @@ function eslintFullyIgnored() {
   )
 }
 
+// ------------------------------------------------------------------ 场景 10：环境预检 + 证据 + 复盘
+
+/** 预检失败不开始 → 修复后走完合同/计划 → 失败门禁落快照 → 复盘 → 通过交付。 */
+async function fullCycle() {
+  step('场景 10：环境预检 + 门禁证据 + 返工复盘')
+  const app = path.join(WORK, 'full-cycle')
+  rmSync(app, { recursive: true, force: true })
+  mkdirSync(path.join(app, 'src'), { recursive: true })
+  writeFileSync(path.join(app, 'src', 'util.mjs'), 'export const add = (a, b) => a + b\n')
+  writeFileSync(
+    path.join(app, 'preflight.mjs'),
+    `import { existsSync, readFileSync } from 'node:fs'\n` +
+      `const file = new URL('./.preflight-mode', import.meta.url)\n` +
+      `const mode = existsSync(file) ? readFileSync(file, 'utf8').trim() : 'ok'\n` +
+      `if (mode === 'fail') { console.error('环境未就绪'); process.exit(3) }\n` +
+      `console.log('环境正常')\n`,
+  )
+  writeFileSync(
+    configFileOf(app),
+    `${JSON.stringify(
+      {
+        checks: { metrics: { enabled: true, roots: ['src'] } },
+        workflow: {
+          enabled: true,
+          gate: { mode: 'full' },
+          preflight: { command: 'node preflight.mjs', timeoutMs: 15000 },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  writeFileSync(path.join(app, '.preflight-mode'), 'fail\n')
+
+  const mcp = new Mcp(app)
+  try {
+    await handshake(mcp)
+
+    const blocked = await mcp.call('task_start', { title: '环境预检', goal: '验证预检失败不创建任务' })
+    check('预检失败时 task_start 返回 ok=false', blocked.value?.ok === false, blocked.text)
+    check('预检失败不创建任务（没有 task.json）', !existsSync(taskFileOf(app)), String(existsSync(taskFileOf(app))))
+    const idle = await mcp.call('task_status')
+    check('预检失败后任务仍为空', idle.value?.active === false, idle.text)
+
+    writeFileSync(path.join(app, '.preflight-mode'), 'ok\n')
+    const started = await mcp.call('task_start', { title: '完整闭环', goal: '预检 + 门禁 + 复盘' })
+    check('修复环境后可以开始任务', started.value?.ok === true, started.text)
+    check('task_start 回传预检结果', started.value?.preflight?.ok === true, started.text)
+
+    const criteria = await mcp.call('task_criteria', {
+      criteria: [
+        { text: '全量检查通过', type: 'compat', source: '仓库约定：交付前跑检查' },
+        { text: '空态已人工走查', type: 'ui', source: '设计稿', verify: 'manual', evidenceFile: 'evidence/shot.txt' },
+      ],
+    })
+    check('写入 gate + manual 条件', criteria.value?.ok === true, criteria.text)
+    const plan = await mcp.call('task_plan', { steps: ['实现', '跑门禁'] })
+    check('计划写入', plan.value?.ok === true, plan.text)
+
+    mkdirSync(path.join(app, 'evidence'), { recursive: true })
+    writeFileSync(path.join(app, 'evidence', 'shot.txt'), '截图说明：空态居中，已与设计确认\n')
+
+    writeFileSync(
+      path.join(app, 'src/bad.ts'),
+      `${Array.from({ length: 21 }, (_, index) => `export const a${index}: any = ${index}`).join('\n')}\n`,
+    )
+    const failed = await mcp.call('task_gate')
+    check('制造一次失败门禁', failed.value?.ok === false && failed.value?.stage === 'verify', failed.text)
+    check(
+      '失败门禁写出证据快照',
+      Boolean(failed.value?.evidencePath) && existsSync(path.join(app, failed.value.evidencePath)),
+      failed.text,
+    )
+    check('失败门禁要求复盘', failed.value?.lessonRequired === true, failed.text)
+
+    const lesson = await mcp.call('task_lesson', {
+      text: '先用门禁定位显式 any，再按具体类型收窄修复',
+      evidence: `${failed.value?.evidenceId ?? 'E1'} 记录了 bad.ts 的显式 any`,
+      scope: 'rule',
+    })
+    check('task_lesson 记录复盘', lesson.value?.ok === true && lesson.value?.lessonId === 'L1', lesson.text)
+
+    rmSync(path.join(app, 'src/bad.ts'))
+    const passed = await mcp.call('task_gate')
+    check('修复并复盘后门禁通过并交付', passed.value?.ok === true && passed.value?.stage === 'deliver', passed.text)
+    check('第二轮返回返工对比 trend（fixed）', passed.value?.trend?.fixed === 1, passed.text)
+    check(
+      '交付门禁同样写出证据快照',
+      Boolean(passed.value?.evidencePath) && existsSync(path.join(app, passed.value.evidencePath)),
+      passed.text,
+    )
+
+    const status = await mcp.call('task_status')
+    check('task_status 可见复盘', (status.value?.lessons ?? []).length === 1, status.text)
+    check('task_status 可见最近证据路径', Boolean(status.value?.lastEvidencePath), status.text)
+    check('复盘追加到 lessons.jsonl', existsSync(path.join(app, '.fe-guard', 'lessons.jsonl')))
+  } finally {
+    mcp.close()
+  }
+}
+
 // ------------------------------------------------------------------ 主流程
 
 async function main() {
@@ -839,6 +977,7 @@ async function main() {
     ['SARIF 输出', sarifOutput],
     ['ESLint ignore', eslintIgnoredFiles],
     ['ESLint 整包忽略', eslintFullyIgnored],
+    ['预检与复盘', fullCycle],
   ]
   for (const [name, run] of scenarios) {
     try {

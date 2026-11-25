@@ -10,10 +10,10 @@
 export const AGENTS_BEGIN = '<!-- fe-guard:begin -->'
 export const AGENTS_END = '<!-- fe-guard:end -->'
 
-/** 主流程：agi 必须按顺序调用的 4 个工具。 */
+/** 主流程：AI 必须按顺序调用的 4 个工具。 */
 export const FLOW_STEPS = [
   { tool: 'task_start', text: '写标题、目标、明确不做什么。' },
-  { tool: 'task_criteria', text: '至少 1 条可验证的验收条件；能写成测试的条件挂 testFile。' },
+  { tool: 'task_criteria', text: '至少 1 条可验证条件，每条必须有 type + source。' },
   { tool: 'task_plan', text: '1-15 步实现计划（写入后合同锁定）。' },
   { tool: 'task_gate', text: '改完代码后跑真实门禁。' },
 ]
@@ -21,20 +21,21 @@ export const FLOW_STEPS = [
 /** 查询类工具：随时可调，不改变阶段。 */
 export const QUERY_TOOLS = [
   { tool: 'task_next', text: '当前阶段、下一个该调用的工具、阻塞项' },
-  { tool: 'task_status', text: '任务、验收条件达成情况、门禁证据摘要' },
+  { tool: 'task_status', text: '任务、条件状态、门禁证据与完成度' },
   { tool: 'ui_lookup', text: '写组件前查已有组件的 props/emits/路径（按需返回，不进上下文）' },
 ]
 
 /** 代码里判定的硬规则，不是提示词建议。 */
 export const HARD_RULES = [
   '没有"把阶段标记为通过"的工具：阶段由事件推导，条件达成由门禁证据推导。',
-  '门禁未通过，或验收条件在门禁之后没有证据，任务不会进入交付态。',
-  '挂 testFile 的条件必须门禁真跑测试且通过才覆盖；测试命令来自配置，模型只给路径。',
-  'baseline 记「文件+规则 → 允许条数」和「文件+指标 → 允许最大值」，只收紧不放宽；同文件"修一条旧违规 + 加一条别的规则"仍会失败。',
-  '写组件前先 `ui_lookup`；与已有组件同名或 props 高度重合会被拦。',
-  '新增依赖必须在 `checks.deps.registry` 登记用途；日期/请求等能力只允许一个库。',
-  'metrics 只拦"比 baseline 更差"：文件行数、长函数、重复块、any 数量。',
-  '大 diff 不进 baseline：超过配置的文件数/行数每次都失败，需要拆 PR。',
+  '门禁未通过，或条件在门禁后没有证据，任务不进入交付态。',
+  '条件必须有 type + source；source 以 assumption 开头 = 推断项，要人跑 `npx fe-guard task confirm <id> --note "..." --yes`，未确认不能交付。',
+  '挂 testFile 的条件必须门禁真跑测试且通过；manual 条件必须有非空 evidenceFile。测试命令来自配置，模型只给路径。',
+  '失败过的门禁，交付前要调 `task_lesson` 写复盘（distill=enforce 时必须）；只报「N 完成 / M 待办」，禁止「全部完成」「其余正常」。',
+  '环境预检失败 = 本次检查未执行，不能当成通过。',
+  'baseline 记「文件+规则→条数」「文件+指标→上限」，只收紧不放宽；同文件修一条旧违规、加一条新规则仍会失败。',
+  '写组件前先 `ui_lookup`；新增依赖必须在 `checks.deps.registry` 登记用途，同类能力只留一个库。',
+  'metrics 只拦"比 baseline 更差"；大 diff 超过配置的文件数/行数每次都失败，需要拆 PR。',
   '要关掉或降级检查，改 `fe-guard.config.json` 的 `enabled` / `level`，不要在代码里绕过。',
 ]
 
@@ -47,11 +48,11 @@ export function agentsBlock() {
   return `${AGENTS_BEGIN}
 ## fe-guard 工作流（必须调用工具推进）
 
-流程状态在 \`.fe-guard/task.json\`，由 fe-guard MCP server 的工具推进。接到开发任务时按顺序调用：
+流程状态在 \`.fe-guard/task.json\`，由 fe-guard MCP server 推进。接到开发任务按顺序调用：
 
 ${numbered(FLOW_STEPS)}
 
-迷路时调 \`task_next\`，看证据调 \`task_status\`。以下约束在代码里判定，不是建议：
+迷路调 \`task_next\`，看证据调 \`task_status\`。以下约束在代码里判定：
 
 ${bulleted(HARD_RULES)}
 
@@ -71,9 +72,41 @@ function ruleBody() {
 
 ${numbered(FLOW_STEPS)}
 
-## 查询类工具（随时可用）
+## 验收条件：type / source / 验收方式
+
+每条条件必须写 \`type\` 与 \`source\`，可选 \`verify\` 与对应证据字段：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| \`type\` | 是 | ui / interaction / data / tracking / compat / performance |
+| \`source\` | 是 | 需求、设计稿或代码出处；无法确认时写 \`assumption: 原因\` |
+| \`verify\` | 否 | gate / test / manual；缺省按 testFile→test、evidenceFile→manual、否则 gate |
+| \`testFile\` | 否 | 仓库内测试文件相对路径；门禁真跑，通过才覆盖该条件 |
+| \`evidenceFile\` | 否 | 仓库内手工证据相对路径；门禁校验存在且非空，并记录 bytes + sha256 |
+
+全部条件都是 \`ui\` 时返回 warning：检查是否漏了交互、数据、埋点、兼容或性能类条件。
+
+## 人工决策：确认与待办（只有 CLI）
+
+MCP **没有** confirm / defer 工具，这两个决定必须由人执行：
+
+- \`npx fe-guard task confirm <id> --note "..." --yes\`：确认 \`source\` 以 \`assumption\` 开头的推断项，必须晚于条件创建，未确认不能交付。
+- \`npx fe-guard task defer <id> --reason "..." --yes\`：明确放弃或转上线待办；交付标 \`degraded\`，完成度单列 \`deferred\`，不能再宣称全部完成。
+
+## 证据、完成度与环境预检
+
+- 每次门禁写 \`.fe-guard/evidence/<taskId>/<evidenceId>.json\`；\`task_gate\` 返回 \`evidencePath\`，\`task_status\` 返回 \`lastEvidencePath\`。
+- \`verify: manual\` 只证明有落盘证据（路径 + 字节数 + sha256），不判断截图或记录内容是否正确。
+- \`completion: { achieved, total, remaining, deferred }\`：只报「N 完成 / M 待办」，禁止「全部完成」「其余正常」。
+- \`trend: { previousNew, fixed, introduced }\`：上一轮失败后仍引入新违规时，先排查是不是改坏了。
+- \`workflow.preflight.command\` 失败 = 本次检查未执行：不产证据、不覆盖条件，不能当成通过。
+- 最近一次失败门禁之后必须有 \`task_lesson\` 复盘；\`workflow.distill\` 默认 \`enforce\`，\`warn\` 仅降级，\`off\` 关闭。
+
+## 查询与只读工具（随时可用）
 
 ${queries()}
+
+- \`npx fe-guard task stats [--json]\`：只读聚合当前任务与归档，看交付/降级、门禁失败率、平均门禁次数、top blocker、复盘与待办数量。
 
 ## 什么情况会被拦住（判定在代码里）
 
@@ -112,7 +145,8 @@ description: 查看 fe-guard 当前阶段与下一步该做什么
 ---
 
 调用 fe-guard MCP 的 \`task_next\` 工具，按返回的 \`nextTool\` 执行下一步，不要跳过工具直接改代码。
-如果 \`stage\` 是 \`none\`，先调用 \`task_start\` 写清目标，再用 \`task_criteria\` 写验收条件。
+如果 \`stage\` 是 \`none\`，先调用 \`task_start\` 写清目标，再用 \`task_criteria\` 写验收条件（每条必须有 type + source）。
+如果 blockers 提示推断项未确认，请人执行 \`npx fe-guard task confirm <id> --note "..." --yes\`；汇报只说「N 完成 / M 待办」。
 `
 }
 
@@ -121,8 +155,9 @@ export function traeCommandGate() {
 description: 跑 fe-guard 真实门禁并处理结果
 ---
 
-调用 fe-guard MCP 的 \`task_gate\` 工具。未通过时按返回的 \`blockers\` 修代码后重跑。
-不要为了让门禁通过去改 \`fe-guard.baseline.json\`、关闭检查或删验收条件。
+调用 fe-guard MCP 的 \`task_gate\` 工具。未通过时先看 \`blockers\`：回归提示、新增违规、未确认推断项、手工证据缺失、失败后的复盘要求。
+按 blockers 修代码后重跑；需要确认或转待办时，请人执行 CLI 的 \`task confirm\` / \`task defer\`（MCP 没有这两个工具）。
+不要为了让门禁通过去改 \`fe-guard.baseline.json\`、关闭检查或删验收条件；失败门禁后用 \`task_lesson\` 写复盘。
 `
 }
 

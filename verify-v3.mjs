@@ -389,7 +389,12 @@ async function uiScenario() {
     await handshake(mcp)
     const list = await mcp.request('tools/list', {})
     const tools = list.result?.tools ?? []
-    check('新增且只新增 ui_lookup（工具总数 7）', tools.length === 7 && tools.some((tool) => tool.name === 'ui_lookup'), tools.map((tool) => tool.name).join(', '))
+    check(
+      '工具总数 8（新增 ui_lookup 与 task_lesson）',
+      tools.length === 8 &&
+        ['ui_lookup', 'task_lesson'].every((name) => tools.some((tool) => tool.name === name)),
+      tools.map((tool) => tool.name).join(', '),
+    )
     check(
       'ui_lookup 描述 ≤ 90 字',
       tools.every((tool) => tool.description.length <= 90),

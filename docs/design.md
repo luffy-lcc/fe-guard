@@ -29,6 +29,18 @@ It doesn't chase "conventions are everything". It does one thing: make "no worse
 - **The component inventory doesn't live in context**: it's written to disk and the AI queries it on demand via `ui_lookup`. Paying resident tokens for occasionally-used information is a bad trade, and the inventory grows with the project — any cached copy goes stale on update.
 - **Failure still leaves evidence**: even when the check fails, the report, baseline tightening, and gate evidence are produced as usual, for post-mortems.
 
+## Workflow evidence model
+
+The workflow layer turns "done" into facts that can be checked:
+
+- Every criterion must state its source and type; assumptions are confirmed by a human and cannot be delivered unconfirmed.
+- Verification is `gate` / `test` / `manual`: tests really run, manual evidence must exist and be non-empty, and its sha256 is recorded.
+- Every gate writes a snapshot (mode, exit code, completion, violation fingerprints, preflight result); a failed gate requires a lesson.
+- `completion` splits covered / deferred / pending; deferred items and remaining criteria are always reported.
+- Environment preflight is whatever command the project configures; a failure means "this check was not executed".
+
+Deliberately not done: visual / screenshot diff, browser / dev-server / login-state preflight, spec distribution and sub-agent orchestration, mobile / real-device checks. See the [roadmap](roadmap.md) for why and what would trigger each.
+
 ## Directory layout
 
 ```
@@ -58,11 +70,14 @@ fe-guard/
 │   ├── html.js                  single-file HTML report (inline CSS/JS, zero external assets)
 │   ├── version.js               tool version shared by SARIF / HTML / --version
 │   ├── commands/                init / check / baseline / feedback / doctor / task
-│   ├── workflow/                state.js (event stream / stage derivation) / tools.js (7 MCP tools) / tests.js (criteria tests)
+│   ├── workflow/                workflow core: state.js (events / stages) / definitions.js (tool schemas) /
+│   │                            criteria.js (type / source / verify) / evidence.js (snapshots + fingerprints) /
+│   │                            gate.js / preflight.js / lessons.js / statistics.js / settings.js /
+│   │                            errors.js / tools.js (handler registry) / tests.js (criteria tests)
 │   ├── mcp/server.js            minimal MCP stdio server (zero deps, newline-delimited JSON-RPC)
 │   ├── ide/                     source.js (single source of truth for artifacts) / tokens.js / artifacts.js (managed files + 5 MCP client configs)
 │   └── runners/                 index.js + eslint / typescript / boundaries / deps / ui / metrics / diff-size
-├── test/                        unit tests + v5/v6/v6.1/v6.2/v6.3 end-to-end + init detection / presets / MCP clients / SARIF / HTML / ESLint classification / trend / task summary / React-TSX / workspace boundaries
+├── test/                        unit tests + v5/v6/v6.1/v6.2/v6.3 end-to-end + init detection / presets / MCP clients / SARIF / HTML / ESLint classification / trend / task summary / React-TSX / workspace boundaries / workflow contract / gate evidence / confirm & defer / preflight / lessons / stats
 ├── examples/sample-app/         sample project with legacy violations (the real trio of tools)
 ├── examples/husky-pre-commit    pre-commit hook example (fast profile)
 ├── verify.sh                    v1 one-command real verification (checks + ratchet)
@@ -72,7 +87,7 @@ fe-guard/
 └── verify-ts7.mjs               TypeScript 7 smoke test (non-Vue: real tsc 7 diagnostics still parse)
 ```
 
-Come back after two months away and you only need four places: `src/baseline.js` (ratchet semantics), `src/workflow/state.js` (how stages are derived), `src/workflow/tools.js` (which operations get rejected), `src/runners/*` (tool adapters). Every file is kept under 500 lines (the same constraint self-check enforces).
+Come back after two months away and you only need four places: `src/baseline.js` (ratchet semantics), `src/workflow/state.js` (how stages are derived), `src/workflow/gate.js` (which operations get rejected), `src/runners/*` (tool adapters). Every file is kept under 500 lines (the same constraint self-check enforces).
 
 ## Verification system
 
@@ -87,6 +102,6 @@ npm run verify:ts7     # TS 7 smoke test: real typescript@7 diagnostics still pa
 npm run self-check     # check fe-guard itself with its fast profile
 ```
 
-No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 113, v3 83, v4 60 — all passing; `npm test` passes 147 (including 17 from v6.1, 5 from v6.2, 5 from v6.3, 5 from init detection, 10 from init presets / `--dry-run`, 6 from multi-client MCP, 6 from SARIF, 6 from the HTML report, 5 from ESLint message classification, 6 from trend / task summary, 3 from React/TSX verification and 6 from cross-package boundaries).
+No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 135, v3 83, v4 60 — all passing; `npm test` passes 174, including the workflow contract (structured criteria, confirm / defer), manual evidence and gate snapshots, preflight, rework diff, lessons / distill and `task stats`.
 
 If any step deviates from expectations, the script prints the expected value, the actual value, and the full output, then exits with code 1. See [CONTRIBUTING](../CONTRIBUTING.md) for the contribution guide.

@@ -173,6 +173,22 @@ npx fe-guard false-positive --suggest   # 按规则给出降级/关闭建议
 
 记录写在 `.fe-guard/false-positives.jsonl`，只追加、不改写、可审计。边界要说清：**标记误报不会让 `check` 忽略这条违规**，它只是证据；要降级请改 `level`，要关闭请改 `enabled`，并走评审。
 
+## 8. 验收条件与证据
+
+通过 MCP 流程做任务时，每条验收条件都是结构化的：
+
+```json
+{ "text": "空态显示 0 条", "type": "ui", "source": "设计稿/spec-v3#empty" }
+```
+
+- `type` 是 `ui` / `interaction` / `data` / `tracking` / `compat` / `performance` 之一；`source` 写明出处。推断项写成 `source: "assumption: 原因"`。
+- `assumption` 条件需要人确认：`npx fe-guard task confirm C2 --note "..." --yes`；未确认的推断项会阻止交付。
+- 能写成测试就挂 `testFile`；否则 `verify: "manual"` 必须有 `evidenceFile`（截图说明、对账记录），门禁会校验存在且非空，并记录字节数与 sha256。
+- 门禁失败后用 `task_lesson` 写复盘（结论 + 证据 + scope）。`workflow.distill` 默认 `enforce`，不写复盘不能交付；确实不需要时才改 `warn` / `off`。
+- 进度口径是「N 完成 / M 待办」（以及未完成）；有待办时交付标记 `degraded`，工具不会说「全部完成」。
+
+`npx fe-guard task stats` 只读查看当前任务与归档的交付 / 降级、门禁失败率、平均门禁次数、top blocker、复盘与待办数量。
+
 ## 常用命令
 
 ```bash
@@ -208,6 +224,9 @@ npx fe-guard false-positive --list / --summary / --suggest
 npx fe-guard task                 # 查看当前任务、验收条件与门禁证据
 npx fe-guard task events          # 事件流（可审计 AI 做过什么、试过绕过什么）
 npx fe-guard task reset --yes     # 归档当前任务并清空（归档到 .fe-guard/tasks/）
+npx fe-guard task stats           # 只读查看当前任务与归档的交付 / 门禁 / 复盘统计
+npx fe-guard task confirm C2 --note "..." --yes   # 人工确认推断项
+npx fe-guard task defer C3 --reason "..." --yes   # 把条件转为上线待办
 npx fe-guard mcp                  # 以 MCP stdio server 启动（IDE 挂载的就是它）
 
 npx fe-guard check --root ../app  # 指定项目根目录（默认当前目录）
@@ -356,21 +375,21 @@ npm i -D fe-guard --registry https://npm.internal.example.com
 npx fe-guard --version
 ```
 
-升级：`npm i -D fe-guard@0.3.0`。回滚：`npm i -D fe-guard@0.2.0`。建议在项目里提交 `package-lock.json`，保证每个人装到同一版。
+升级：`npm i -D fe-guard@0.4.0`。回滚：`npm i -D fe-guard@0.3.0`。建议在项目里提交 `package-lock.json`，保证每个人装到同一版。
 
 ### 路线 B：tarball 直接装（没有 registry 也能用）
 
 ```sh
 # 维护者机器上
-npm pack                      # 产出 fe-guard-0.3.0.tgz
+npm pack                      # 产出 fe-guard-0.4.0.tgz
 # 把 tgz 通过内网网盘 / scp / 共享目录发给使用方
 
 # 使用方项目
-npm i -D ./fe-guard-0.3.0.tgz
+npm i -D ./fe-guard-0.4.0.tgz
 npx fe-guard --version
 ```
 
-升级：拿到新 tgz 后 `npm i -D ./fe-guard-0.3.0.tgz`。回滚：`npm i -D ./fe-guard-0.2.0.tgz`（旧 tgz 保留在共享目录即可）。
+升级：拿到新 tgz 后 `npm i -D ./fe-guard-0.4.0.tgz`。回滚：`npm i -D ./fe-guard-0.3.0.tgz`（旧 tgz 保留在共享目录即可）。
 
 `npm pack` 只包含 `bin/`、`src/`、`examples/`、`README.md`、`README.zh-CN.md`、`LICENSE`、`CHANGELOG.md`，不包含测试与验证脚本；`bin` 的执行位由 npm 自动恢复，安装后 `npx fe-guard` 可直接运行。
 

@@ -40,6 +40,8 @@ const FIRST_RUN_NOTES = [
   '  - 跑一次 baseline 入账后，check 默认只逐条展示新增；存量收敛成一行摘要。',
   '  - 想看存量明细：npx fe-guard baseline --show（按文件分组，含首次入账日期）。',
   '  - 觉得某条被冤枉：npx fe-guard false-positive --file <文件> --rule <规则> --reason "原因"。',
+  '  - 接了 AI 流程后：npx fe-guard task stats 只读查看交付/降级、门禁失败率与复盘数量；',
+  '    推断项由人执行 npx fe-guard task confirm <id> --note "..." --yes，AI 不能自己批准。',
   '',
   '下一步:',
   '  1. 把存量违规记进 baseline（第一次运行后，检查才会从「全红」变成「只看新增」）:',

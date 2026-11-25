@@ -10,12 +10,12 @@ So the workflow layer does this:
 
 - The workflow is made of **tools** (an MCP server). The AI must call tools to advance; stages are derived from the events the tools write.
 - Hard rules live in **code**. There is no "mark the stage as passed" tool; nothing the model outputs can move a task into the delivered state.
-- The generated rule file keeps only the shortest set of non-standard conventions (the AGENTS.md snippet is ~530 tokens, capped at 600).
+- The generated rule file keeps only the shortest set of non-standard conventions (the AGENTS.md snippet is ~591 tokens, capped at 600).
 
 ## Connecting Trae
 
 1. Run `npx fe-guard init` in the project (it writes `.trae/mcp.json`).
-2. Open Trae's MCP panel, confirm `fe-guard` appears, and you should see 6 `task_*` tools and 1 `ui_lookup`.
+2. Open Trae's MCP panel, confirm `fe-guard` appears, and you should see 7 `task_*` tools and 1 `ui_lookup`.
 3. `.trae/rules/fe-guard.md` is read as a project rule; `.trae/commands/` gains two slash commands, `/fe-guard-next` and `/fe-guard-gate`.
 
 The generated config looks roughly like:
@@ -63,12 +63,12 @@ The AI calls the following tools in order (every request and return value is vis
 | Step | Tool | Returns |
 | --- | --- | --- |
 | 1 | `task_start` | `{ ok, taskId, stage: "contract", next: "task_criteria" }` |
-| 2 | `task_criteria` | `{ ids: ["C1","C2"], stage: "plan" }` |
+| 2 | `task_criteria` | `{ ids: ["C1","C2"], stage: "plan", types: { ui: 1, data: 1 } }` |
 | 3 | `task_plan` | `{ stage: "implement", next: "task_gate" }` |
 | 4 | Edit code | — |
-| 5 | `task_gate` | Passed: `{ ok: true, stage: "deliver", criteria: { total: 2, achieved: 2 } }` |
+| 5 | `task_gate` | Passed: `{ ok: true, stage: "deliver", completion: { achieved: 2, total: 2, remaining: [], deferred: [] } }` |
 
-Criteria that can be written as tests can carry a `testFile` (repo-relative path, e.g. `{ text: "formatDuration(1000) returns 1s", testFile: "test/duration.test.mjs" }`). The gate really runs that test, and **only a pass covers the criterion**; the test command comes from the config `workflow.gate.testCommand` (default `node --test`) — the model can only supply a path, never a command.
+Criteria that can be written as tests can carry a `testFile` (repo-relative path, e.g. `{ text: "formatDuration(1000) returns 1s", type: "data", source: "requirement#duration", testFile: "test/duration.test.mjs" }`). The gate really runs that test, and **only a pass covers the criterion**; the test command comes from the config `workflow.gate.testCommand` (default `node --test`) — the model can only supply a path, never a command. Every criterion also needs `type` and `source`; the next sections explain the rest of the contract.
 
 When the gate does not pass, step 5 returns:
 
@@ -76,7 +76,7 @@ When the gate does not pass, step 5 returns:
 {
   "ok": false,
   "stage": "verify",
-  "criteria": { "total": 2, "achieved": 0 },
+  "completion": { "achieved": 0, "total": 2, "remaining": [{ "id": "C1", "text": "..." }], "deferred": [] },
   "blockers": [
     "门禁未通过：新增 1 条违规（error 1）",
     "eslint/@typescript-eslint/no-explicit-any @ src/utils/math.ts:12",
@@ -88,16 +88,118 @@ When the gate does not pass, step 5 returns:
 
 The AI fixes things according to the blockers and calls `task_gate` again. The tool never returns the full log (avoiding stuffing tens of thousands of lines back into context); when it needs details it reads `.fe-guard/report.json` itself.
 
+## Acceptance criteria: type, source, verification
+
+Every criterion is structured; a plain `{ text }` is rejected:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `type` | yes | `ui` / `interaction` / `data` / `tracking` / `compat` / `performance` |
+| `source` | yes | Where it comes from: requirement, design, code or existing behaviour. If you cannot point to a source, write `assumption: <reason>` |
+| `verify` | no | `gate` / `test` / `manual`. Missing → `test` if `testFile`, `manual` if `evidenceFile`, otherwise `gate` |
+| `testFile` | no | Repo-relative test file; the gate really runs it and only a pass covers the criterion |
+| `evidenceFile` | no | Repo-relative manual evidence (screenshot notes, reconciliation records); the gate checks it exists and is non-empty |
+
+```json
+{
+  "criteria": [
+    { "text": "empty state shows 0 items", "type": "ui", "source": "design/spec-v3#empty", "verify": "gate" },
+    { "text": "formatDuration(1000) returns 1s", "type": "data", "source": "requirement#duration", "testFile": "test/duration.test.mjs" },
+    { "text": "keyboard focus follows tab order", "type": "interaction", "source": "assumption: design draft does not cover keyboard", "verify": "manual", "evidenceFile": "docs/evidence/focus.md" }
+  ]
+}
+```
+
+`testFile` and `evidenceFile` are mutually exclusive, and `verify` must agree with them (test → testFile, manual → evidenceFile, gate → neither). If every criterion is `ui`, `task_criteria` returns a warning — not a block, but usually a sign that data, interaction, tracking, compat or performance criteria are missing.
+
+## Human decisions: confirm and defer
+
+Two decisions are deliberately CLI-only — there is no MCP tool for them, so the model cannot approve itself:
+
+```bash
+# Confirm an assumption criterion (must be recorded after the criterion was declared)
+npx fe-guard task confirm C2 --note "asked the PM: empty state should hide the list" --yes
+
+# Turn a criterion into an explicit release todo
+npx fe-guard task defer C3 --reason "backend endpoint not integrated yet" --yes
+```
+
+- `confirm` only accepts criteria whose `source` starts with `assumption`; a confirmation recorded before the criterion was declared does not count.
+- `defer` means "explicitly drop or ship later". Deferred criteria need no evidence, but delivery is marked `degraded` and the completion lists them separately.
+- Neither command can mark a task as delivered; the stage is still derived from events.
+
+With 3 criteria, 2 covered and 1 deferred, the response says "2 done / 1 deferred" — never "all done". `task status` and `task events --summary` use the same wording.
+
+## Evidence: snapshots and manual files
+
+Every gate writes `.fe-guard/evidence/<taskId>/<evidenceId>.json` with the mode, exit code, summary, completion, criteria tests, manual evidence, violation fingerprints and preflight result. `task_gate` returns `evidencePath`; `task_status` returns `lastEvidencePath` plus each evidence item's path. If the write fails, the gate result is unchanged but the path is `null`.
+
+`verify: manual` criteria record `{ file, bytes, sha256 }` — a fingerprint of the file at gate time (the same hash can later verify it was not replaced). That proves the file existed and was not swapped, but it does **not** prove the screenshot or note is semantically correct; visual judgement still needs a human or an external tool.
+
+`completion` is `{ achieved, total, remaining, deferred }`. Report "N done / M remaining" (plus deferred); never claim everything is done while `remaining` or `deferred` is non-empty.
+
+## Environment preflight
+
+```json
+{ "workflow": { "preflight": { "command": "npm run check:env", "timeoutMs": 60000 } } }
+```
+
+An empty `command` (the default) disables preflight. When configured:
+
+- `task_start` runs it first. Failure returns `ok:false` with the command, exit code and output tail, and **no task is created**.
+- `task_gate` runs it again. Failure appends `preflight.failed` and returns "environment preflight failed, this check was not executed": no evidence is written and criteria are not overwritten.
+
+The command is split on whitespace (no shell interpretation), like `workflow.gate.testCommand`. fe-guard only runs the command the project provides — it does not know about your dev server, proxy or login state.
+
+## Rework diff: fixed vs introduced
+
+Gate evidence stores violation fingerprints (rule + file + line, capped at 100). Each gate compares with the previous run and returns:
+
+```json
+{ "trend": { "previousNew": 3, "fixed": 2, "introduced": 1 } }
+```
+
+If the previous gate failed and this run still introduces new violations, a regression blocker is added ("confirm you did not break something while fixing another"). Boundaries has no line numbers, so those fingerprints compare file + rule; moving code around can look like a fix or a regression.
+
+## Retrospective: task_lesson and distill
+
+`task_lesson` records a conclusion after a failed gate:
+
+```json
+{ "text": "the flaky test was a timer, not the new code", "evidence": ".fe-guard/evidence/T-.../E2.json", "scope": "none", "scopeReason": "one-off, no rule to change" }
+```
+
+- `scope` is `skill` / `rule` / `none`; `none` requires `scopeReason`.
+- Records are appended to `.fe-guard/lessons.jsonl`; the event stream remains the source of truth.
+- `workflow.distill` controls enforcement: `enforce` (default) blocks delivery until a lesson is recorded after the last failed gate; `warn` allows delivery but marks it `degraded`; `off` disables the requirement.
+
+## Effect stats: task stats
+
+```bash
+npx fe-guard task stats
+npx fe-guard task stats --json
+```
+
+A read-only aggregate of the current task plus `.fe-guard/tasks/` archives: tasks, delivered / degraded / active, gate runs and failure rate, average gates per task, top blockers by rule, lessons and deferred criteria. Corrupt archive files are skipped and counted. It never writes state.
+
 ## When the AI gets blocked
 
 | What it tries | What actually happens |
 | --- | --- |
 | Edit code without writing a contract | With no task, `task_plan` / `task_gate` error out and tell it to `task_start` first |
 | Write a plan without acceptance criteria | `task_plan` errors: criteria must come first |
-| Declare "achieved" itself | No such tool; `task_criteria` only accepts `id` / `text` / `testFile` — passing `achieved` is rejected |
+| Write a criterion without `type` / `source` | `task_criteria` rejects the call and names the missing fields |
+| Declare "achieved" itself | No such tool; `task_criteria` only accepts `id` / `text` / `type` / `source` / `verify` / `testFile` / `evidenceFile` — passing `achieved` is rejected |
 | Attach a testFile but write no test / let the test fail | The gate really runs the test: missing file, failure, and timeout all block; the result is written into the evidence |
+| Declare a manual criterion but leave the evidence file missing or empty | The gate reports a blocker and does not cover the criterion |
+| Leave an `assumption` criterion unconfirmed | The gate blocks delivery with the exact `task confirm` command |
+| Try to `confirm` / `defer` through MCP | No such tools exist — a human must run the CLI |
+| Claim "all done" after a `defer` | Completion returns "N done / M deferred"; the response never says "all done" |
 | Declare "stage passed" itself | No such tool; `task_status` does not accept a `status` parameter either |
 | Try to deliver with the gate not passed | Stays at `verify`; no delivery event is produced and the achieved-criteria count remains 0 |
+| Deliver after a failed gate without a lesson (distill `enforce`) | Blocked with a pointer to `task_lesson` |
+| Start a task while the environment preflight fails | `task_start` returns `ok:false` and creates no task |
+| Treat a failed preflight gate as a pass | The gate says "this check was not executed": no evidence, criteria not covered |
 | Rewrite the plan / start the task again | Rejected; an undelivered task cannot be `task_start`ed again |
 | Edit the baseline to turn the gate green | `task_gate` only tightens the baseline; widening requires a manual `fe-guard baseline --widen` |
 
@@ -122,11 +224,11 @@ When the gate passes on the first try, `implement` jumps straight to `deliver`; 
 
 | Item | Magnitude |
 | --- | --- |
-| `AGENTS.md` managed snippet (always resident) | ~530 tokens, capped at 600; `init` validates it |
+| `AGENTS.md` managed snippet (always resident) | ~591 tokens, capped at 600; `init` validates it |
 | A single tool return | 200–600 bytes of JSON (the gate is the longest, with blockers); `ui_lookup` is usually under 300 bytes |
-| `tools/list` (fetched once at IDE startup) | ~2.6 KB (7 tools) |
+| `tools/list` (fetched once at IDE startup) | ~2.9 KB (8 tools) |
 
-For comparison: the same workflow written as natural-language rules typically costs 800–1500 resident tokens and is not executable. Here the resident cost is squeezed to 530 tokens, with the decision logic inside the tools.
+For comparison: the same workflow written as natural-language rules typically costs 800–1500 resident tokens and is not executable. Here the resident cost is squeezed to 591 tokens, with the decision logic inside the tools.
 
 ## Switches
 
@@ -135,7 +237,9 @@ For comparison: the same workflow written as natural-language rules typically co
   "workflow": {
     "enabled": true,
     "gate": { "mode": "full", "testCommand": "node --test", "testTimeoutMs": 120000 },
-    "stages": { "contract": "enforce", "plan": "enforce", "verify": "enforce" }
+    "stages": { "contract": "enforce", "plan": "enforce", "verify": "enforce" },
+    "preflight": { "command": "", "timeoutMs": 60000 },
+    "distill": "enforce"
   }
 }
 ```
@@ -149,6 +253,8 @@ For comparison: the same workflow written as natural-language rules typically co
 | `workflow.stages.contract` | With `enforce`, criteria can only be written in the contract stage; `warn` allows adding them later; `off` imposes no restriction |
 | `workflow.stages.plan` | With `enforce`, the gate cannot run without a plan |
 | `workflow.stages.verify` | With `enforce`, a failed gate cannot cover acceptance criteria; `warn` allows coverage, but delivery is marked `degraded` |
+| `workflow.preflight.command` / `timeoutMs` | Optional environment preflight (default empty = off). A failure stops `task_start` and makes `task_gate` report "not executed" — never a pass |
+| `workflow.distill` | `enforce` (default) / `warn` / `off`: whether a lesson is required after a failed gate |
 
 `implement` / `deliver` have no separate switches: they are derived entirely from events, not decision points that can be widened.
 
@@ -157,3 +263,5 @@ For comparison: the same workflow written as natural-language rules typically co
 `init` generates `.trae/hooks.example.json` and `.cursor/hooks.example.json`, containing "run `check --diff-only --profile fast` after tool calls" and "run `check --staged --profile fast` at session end". They **do not take effect automatically** — you must move the commands into your IDE's hooks settings; event names depend on the version you use.
 
 Neither IDE has a git pre-commit event; pre-commit blocking still goes through Husky + `fe-guard check --staged --profile fast`.
+
+Next: [roadmap](roadmap.md) — where fe-guard is headed and what is next.

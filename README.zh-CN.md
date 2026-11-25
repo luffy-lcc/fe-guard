@@ -24,6 +24,10 @@ fe-guard 只做一件事：让「**不准更差**」自动执行。存量欠债�
 - **七项检查**：ESLint / TypeScript / 架构边界（编排外部工具）+ 依赖守卫 / 组件清单 / 腐化指标 / 大 diff（自带轻量实现）。
 - **baseline 双轨棘轮**：条数 + 指标最大值，只紧不松，`firstSeen` / `widenLog` 可审计。
 - **MCP 流程层**：事件溯源，阶段由事件推导，AI 无法自报「通过」；验收条件可挂测试，门禁真跑。
+- **结构化合同 + 人工决策**：每条条件必须有 `type`（ui / interaction / data / tracking / compat / performance）与 `source`；`assumption` 推断项必须由人 `task confirm`，人也可以 `task defer` 把条件转成上线待办——此时交付标 `degraded`，只报「N 完成 / M 待办」，不说「全部完成」。
+- **证据而不是口头声称**：每次门禁写快照到 `.fe-guard/evidence/<taskId>/<evidenceId>.json`；`verify: manual` 证据记录路径、字节数与 sha256；`completion` 给出 `achieved / total / remaining / deferred`。
+- **环境预检、返工对比与复盘**：`workflow.preflight.command` 环境不对就不开始，门禁也不会在未执行时假通过；门禁指纹返回 `fixed` / `introduced`；`task_lesson` + `workflow.distill` 要求失败门禁后必须复盘。
+- **效果统计**：只读 `fe-guard task stats [--json]` 聚合交付/降级、门禁失败率、平均门禁次数、top blocker、复盘与待办数量。
 - **fast / full 两档**：钩子 3 秒内，合并前手动全档。
 - **诚实工程**：检查没真正执行就报 `not-executed`（不可入账），跳过 ≠ 通过，绝不假绿灯。
 - **可分享的输出**：`check --format sarif` 直接接 GitHub Code Scanning（只含新增违规与 `not-executed`，存量不会淹没告警页）；`check --format html` 生成单文件报告，零外部资源。
@@ -36,6 +40,7 @@ npm i -D fe-guard          # npm 未发布时：npm i -D github:luffy-lcc/fe-gua
 npx fe-guard init          # 先探测项目，再生成配置 / 空账本 / AGENTS.md 片段 / IDE 接入产物
 npx fe-guard baseline      # 把现有违规一次入账（检查立刻变绿）
 npx fe-guard check         # 只拦新增；修掉旧违规自动收紧
+npx fe-guard task stats    # AI 跑过任务后：只读查看交付 / 门禁 / 复盘统计
 # .husky/pre-commit:
 npx fe-guard check --staged --profile fast
 ```
@@ -52,7 +57,7 @@ npx fe-guard check --staged --profile fast
 { "mcpServers": { "fe-guard": { "command": "node", "args": ["./node_modules/fe-guard/bin/fe-guard-mcp.js"] } } }
 ```
 
-AI 获得 6 个 `task_*` 工具 + `ui_lookup`，必须调用工具推进「合同 → 验收条件 → 计划 → 实现 → 验证 → 交付」。阶段判定在代码里，无法自报「通过」。macOS GUI 应用不加载 shell PATH——nvm/fnm 下请把 `command`/`args` 改成绝对路径（[常见问题](docs/zh/faq.md)）。
+AI 获得 7 个 `task_*` 工具 + `ui_lookup`，必须调用工具推进「合同 → 验收条件 → 计划 → 实现 → 验证 → 交付」。阶段判定在代码里，无法自报「通过」。macOS GUI 应用不加载 shell PATH——nvm/fnm 下请把 `command`/`args` 改成绝对路径（[常见问题](docs/zh/faq.md)）。
 
 完整流程：[workflow](docs/zh/workflow.md)。
 
@@ -69,6 +74,7 @@ AI 获得 6 个 `task_*` 工具 + `ui_lookup`，必须调用工具推进「合�
 | 常见问题与排错 | [faq](docs/zh/faq.md) |
 | 已知限制与明确没做 | [limitations](docs/zh/limitations.md) |
 | 设计取舍与架构 | [design](docs/zh/design.md) |
+| 路线图 | [roadmap](docs/zh/roadmap.md) |
 | 真实仓库实测报告 | [real-world](docs/zh/real-world.md) |
 
 英文文档：[README.md](./README.md) · [docs/](docs/)。

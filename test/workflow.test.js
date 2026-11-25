@@ -79,7 +79,7 @@ test('workflow 配置：默认全开，一行可关掉整个流程层', () => {
     listTools(disabled).map((tool) => tool.name),
     ['task_gate'],
   )
-  assert.equal(listTools(enabled).length, 7)
+  assert.equal(listTools(enabled).length, 8)
 })
 
 test('workflow 配置：非法取值报错，阶段可单独降级', () => {
@@ -99,9 +99,18 @@ test('工具集：数量 ≤ 8（v3 新增 ui_lookup），描述短，schema 拒
     assert.ok(tool.description.length <= 90, `${tool.name} 描述过长`)
     assert.equal(tool.inputSchema.additionalProperties, false, `${tool.name} 应拒绝未知字段`)
   }
-  // 验收条件的 schema 只允许 id/text/testFile：模型不能传 achieved
+  // 验收条件的 schema 只允许合同字段：模型不能传 achieved
   const criteria = tools.find((tool) => tool.name === 'task_criteria')
-  assert.deepEqual(Object.keys(criteria.inputSchema.properties.criteria.items.properties).sort(), ['id', 'testFile', 'text'])
+  assert.deepEqual(Object.keys(criteria.inputSchema.properties.criteria.items.properties).sort(), [
+    'evidenceFile',
+    'id',
+    'source',
+    'testFile',
+    'text',
+    'type',
+    'verify',
+  ])
+  assert.deepEqual(criteria.inputSchema.properties.criteria.items.required, ['text', 'type', 'source'])
 })
 
 test('AGENTS.md 片段：受管 marker 成对出现且不超过 token 上限', () => {

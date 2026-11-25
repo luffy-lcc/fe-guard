@@ -34,6 +34,15 @@ export function toPosix(filePath) {
   return filePath.split(path.sep).join('/')
 }
 
+/** 配置里的超时字段：省略用默认值，非法值统一按配置错误处理。 */
+export function normalizeTimeout(value, fallback, label, source) {
+  if (value === undefined) return fallback
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    throw new UserError(`${source} 中 ${label} 必须是正数（毫秒）`)
+  }
+  return value
+}
+
 /** 把工具输出的绝对路径/相对路径统一成相对仓库根的 posix 路径。base 是工具的执行目录。 */
 export function toRepoPath(root, filePath, base = root) {
   if (!filePath) return ''

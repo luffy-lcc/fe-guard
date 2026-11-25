@@ -62,10 +62,19 @@
 - **For one person maintaining multiple repos, the upgrade cost is in "verifying repo by repo"**, not in releasing. Run it in one repo for a full two weeks before copying the config to a second.
 - **`workflow` only constrains operations "through the tools".** The AI can skip MCP entirely and edit files directly — the workflow won't know; what it blocks is "claiming completion inside the workflow". The truly unbypassable backstop remains local `fe-guard check --full` and Husky's `--staged --profile fast`.
 - **Acceptance criteria have optional semantic binding**: a criterion with a `testFile` is covered only when the gate really runs the test and it passes under enforce; criteria without a test are still covered only by "gate evidence passing after the criterion was written" — no guarantee that "this pass proved this criterion". The test command comes from config; the model only supplies the path.
+- **`type` / `source` are model-declared.** The tool checks that they exist and that `type` is one of the six values; it does not verify that the source really exists or that the category is right. If the model omits a whole category (say, tracking), the contract can still look all green.
+- **`confirm` / `defer` are human decision markers, not authentication.** They are CLI-only so the MCP tool list cannot call them, but an AI with shell access could still run them. Review and shell permissions remain the backstop.
+- **Manual evidence's sha256 proves existence and integrity only.** It proves a file existed and did not change after the gate; it does not prove the screenshot or note is correct. Visual judgement still needs a human or an external tool.
+- **Preflight only runs the project's configured command.** It does not know about your dev server, proxy, login state or data fixtures. A wrong command or a timeout is treated as "not executed", never as a pass.
+- **Trend fingerprints are capped at 100 and line-less for boundaries.** They compare rule + file + line; semantic equivalence or moving code can look like `fixed` or `introduced`.
+- **distill's evidence is free text and not machine-verified.** `enforce` blocks delivery until a lesson exists, but the lesson's quality is up to the author; switch to `warn` / `off` if it gets in the way.
+- **`task stats` only reads the current task plus archives.** Corrupt archives are skipped and counted; deleting an archive is not audited retroactively.
+- **`completion` only reflects acceptance criteria.** Reconciling plan steps with the actual diff is not automated yet.
+- **`task_criteria` is a breaking change.** Old MCP calls must add `type` / `source`; historical `task.json` events without them still replay and display as `unknown`.
 - **`implement` / `deliver` have no downgrade switch.** They are positions derived from events, not decision points, so config only exposes the three stages `contract` / `plan` / `verify`.
 - **hooks are example files only** and don't take effect automatically; event names must be aligned with your IDE version. Neither IDE has a git pre-commit event.
 - **Task state is single-repo, single-task**: only one task in progress at a time, auto-archived to `.fe-guard/tasks/` after delivery; no cross-repo aggregation, no concurrent task queue.
-- **The AGENTS.md snippet is a "non-standard convention" for the model**, capped at 600 tokens (~530 measured). It doesn't replace the decisions in the tools — even if the model ignores it entirely, the tools still reject illegal operations.
+- **The AGENTS.md snippet is a "non-standard convention" for the model**, capped at 600 tokens (~591 measured). It doesn't replace the decisions in the tools — even if the model ignores it entirely, the tools still reject illegal operations.
 
 ## Explicitly not done (don't expect these)
 

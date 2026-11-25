@@ -1,8 +1,9 @@
 import path from 'node:path'
 import { existsSync } from 'node:fs'
-import { UserError, readJsonFile } from './utils.js'
+import { UserError, normalizeTimeout, readJsonFile } from './utils.js'
 import { isNotExecutedRule } from './not-executed.js'
 import { DEFAULT_PROFILE, isProfileName, PROFILE_NAMES } from './profiles.js'
+import { normalizeWorkflow } from './workflow/settings.js'
 
 export const CONFIG_FILE = 'fe-guard.config.json'
 export const CONFIG_SCHEMA_VERSION = 1
@@ -47,6 +48,10 @@ export function defaultConfig() {
       enabled: true,
       gate: { mode: 'full', testCommand: 'node --test', testTimeoutMs: 120000 },
       stages: { contract: 'enforce', plan: 'enforce', verify: 'enforce' },
+      // 环境预检默认关闭（空命令）；配置后失败会导致开始/门禁直接失败。
+      preflight: { command: '', timeoutMs: 60000 },
+      // 失败门禁之后是否必须复盘：enforce 拦截交付，warn 仅标记 degraded，off 关闭。
+      distill: 'enforce',
     },
   }
 }
@@ -380,14 +385,6 @@ function normalizeVue(value, fallback, source) {
   throw new UserError(`${source} 中 checks.typescript.vue 只能是 auto、true 或 false`)
 }
 
-function normalizeTimeout(value, fallback, label, source) {
-  if (value === undefined) return fallback
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    throw new UserError(`${source} 中 ${label} 必须是正数（毫秒）`)
-  }
-  return value
-}
-
 function normalizeList(value, fallback, label, source) {
   if (value === undefined) return [...fallback]
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
@@ -454,36 +451,6 @@ export function checkEnabled(config, key) {
 export function adapterOfRule(ruleId) {
   const index = ruleId.indexOf('/')
   return index === -1 ? ruleId : ruleId.slice(0, index)
-}
-
-const WORKFLOW_LEVELS = ['enforce', 'warn', 'off']
-const GATE_MODES = ['full', 'diff-only', 'staged']
-
-/**
- * 流程层配置。默认全开；`enabled: false` 一行退回 v1 纯检查模式。
- * 每个有约束的阶段可以单独 enforce / warn / off（deliver 是终态，implement 的约束由 plan 承担）。
- */
-function normalizeWorkflow(raw = {}, source) {
-  const stages = {}
-  for (const stage of ['contract', 'plan', 'verify']) {
-    const level = raw.stages?.[stage] ?? 'enforce'
-    if (!WORKFLOW_LEVELS.includes(level)) {
-      throw new UserError(
-        `${source} 中 workflow.stages.${stage} 只能是 ${WORKFLOW_LEVELS.join(' / ')}，当前为 "${level}"`,
-      )
-    }
-    stages[stage] = level
-  }
-  const mode = raw.gate?.mode ?? 'full'
-  if (!GATE_MODES.includes(mode)) {
-    throw new UserError(`${source} 中 workflow.gate.mode 只能是 ${GATE_MODES.join(' / ')}，当前为 "${mode}"`)
-  }
-  const testCommand = raw.gate?.testCommand ?? 'node --test'
-  if (typeof testCommand !== 'string' || testCommand.trim() === '') {
-    throw new UserError(`${source} 中 workflow.gate.testCommand 必须是非空字符串，例如 "node --test" 或 "npx vitest run"`)
-  }
-  const testTimeoutMs = normalizeTimeout(raw.gate?.testTimeoutMs, 120000, 'workflow.gate.testTimeoutMs', source)
-  return { enabled: raw.enabled !== false, gate: { mode, testCommand: testCommand.trim(), testTimeoutMs }, stages }
 }
 
 export function stageLevel(config, stage) {

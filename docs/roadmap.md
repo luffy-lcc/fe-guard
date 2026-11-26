@@ -11,7 +11,7 @@ fe-guard has one job: make "no worse than before" automatic. This page records w
 - **0.3.0** — SARIF output, single-file HTML report, `baseline --trend`, `task events --summary`.
 - **0.4.0 (completed)** — React/TSX verification on a real repository (four real issues found and fixed); monorepo cross-package boundaries; structured acceptance criteria, `task confirm` / `task defer`, manual evidence and gate snapshots, environment preflight, rework diff, `task_lesson` + `workflow.distill`, read-only `task stats`.
 
-## 0.5.0 (completed, latest)
+## 0.5.0 (completed)
 
 Theme: **per-package legacy debt accounting**, so a monorepo baseline stops mixing packages.
 
@@ -27,26 +27,28 @@ Delivered:
 
 Not in 0.5.0: `--follow-renames` in package mode, automatic conflict resolution; deps / ui / metrics / boundaries still run once at the root (metrics ratchets do follow file ownership into package ledgers).
 
-## 0.6.0 (planned)
+## 0.6.0 (completed, current release)
 
 Theme: **external integration for verification environments and visual evidence**.
 
-Goals (planned, not implemented):
+Delivered:
 
-1. `workflow.preflight` accepts multi-step named checks via `steps[]`, keeping the existing single-command form compatible.
-2. Manual / visual evidence adds `evidenceKind` (`screenshot` / `diff` / `log`) and a way to view it; visual comparison is still performed by the project's own command.
-3. Optional `workflow.visualDiff.command`: only runs a command the project provides; stdout / exit code become evidence; no runtime dependency is added.
-4. Validation on a real project plus bilingual docs.
+1. `workflow.preflight` accepts multi-step named checks via `steps[]`, mutually exclusive with the single `command`; steps run in order, stop on the first failure, and name the failed step.
+2. Criteria add `evidenceKind` (`screenshot` / `diff` / `log`); manual evidence infers the kind from the extension, and gate only accepts `diff`.
+3. `workflow.visualDiff.command` only runs the project's command; stdout / exit code / hash become evidence; no runtime dependency is added.
+4. A visual criterion is covered only when `visualDiff.ok` is true; a missing command, timeout or non-zero exit is never a pass.
+5. Bilingual docs and the `verify-v4` scenario are updated.
 
-Acceptance gates:
+Acceptance results:
 
-- Existing single-command preflight keeps working; a `steps[]` failure names the step that failed.
-- `evidenceKind` is recorded and readable without new runtime dependencies.
-- `workflow.visualDiff.command` never starts a browser or installs a package; a missing command is "not executed", never a pass.
+- The existing single-command preflight still works; a `steps[]` failure names the step.
+- `evidenceKind` is recorded and readable via `task status` / `task status --json` without new runtime dependencies.
+- `visualDiff.command` never starts a browser or installs a package; a missing command is "not executed", never a pass.
+- Tests: `npm test` passes 191; `verify-v4.mjs` reaches 80 assertions (v1 37 / v2 135 / v3 83 / v4 80).
 
-Out of scope: built-in browser automation, a pixel-diff implementation, mobile / real-device checks.
+Not included: built-in browser automation, a pixel-diff implementation, mobile / real-device checks, per-criterion mapping to multiple visual commands.
 
-Maintenance and distribution: 0.4.x receives regression fixes only; 0.5.0 is released; npm publishing is reassessed once there is clear external demand.
+Maintenance and distribution: 0.5.x receives regression fixes only; 0.6.0 is released; npm publishing is reassessed once there is clear external demand.
 
 ## Next candidates
 

@@ -80,8 +80,8 @@ fe-guard/
 │   ├── version.js               tool version shared by SARIF / HTML / --version
 │   ├── commands/                init / check / baseline (+ baseline-shared.js core) / feedback / doctor / task
 │   ├── workflow/                workflow core: state.js (events / stages) / definitions.js (tool schemas) /
-│   │                            criteria.js (type / source / verify) / evidence.js (snapshots + fingerprints) /
-│   │                            gate.js / preflight.js / lessons.js / statistics.js / settings.js /
+│   │                            criteria.js (type / source / verify / evidenceKind) / evidence.js (snapshots + fingerprints + visual output) /
+│   │                            gate.js / preflight.js / visual-diff.js / lessons.js / statistics.js / settings.js /
 │   │                            errors.js / tools.js (handler registry) / tests.js (criteria tests)
 │   ├── mcp/server.js            minimal MCP stdio server (zero deps, newline-delimited JSON-RPC)
 │   ├── ide/                     source.js (single source of truth for artifacts) / tokens.js / artifacts.js (managed files + 5 MCP client configs)
@@ -92,7 +92,7 @@ fe-guard/
 ├── verify.sh                    v1 one-command real verification (checks + ratchet)
 ├── verify-v2.mjs                v2 one-command real verification (MCP protocol + counterexamples + artifacts + SARIF + ESLint ignore)
 ├── verify-v3.mjs                v3 one-command real verification (positive/negative cases for the four new checks + incremental adoption + per-check disable)
-├── verify-v4.mjs                v4 one-command real verification (monorepo / vue-tsc / first-run view / baseline / false positives / cross-package boundaries)
+├── verify-v4.mjs                v4 one-command real verification (monorepo / vue-tsc / first-run view / baseline / false positives / cross-package boundaries / package baseline / visual evidence)
 └── verify-ts7.mjs               TypeScript 7 smoke test (non-Vue: real tsc 7 diagnostics still parse)
 ```
 
@@ -106,11 +106,11 @@ npm run verify:local   # local one-command: npm test + all v1/v2/v3/v4 verificat
 npm run verify         # v1: copy the sample project into a temp dir, run full scenarios, assert exit codes
 npm run verify:v2      # v2: full session over the real MCP protocol + counterexamples + artifacts
 npm run verify:v3      # v3: positive/negative cases for the four new checks + incremental adoption + per-check disable
-npm run verify:v4      # v4: per-package monorepo runs + planted .vue type errors + first-run view + false-positive loop
+npm run verify:v4      # v4: per-package monorepo runs + planted .vue type errors + first-run view + false-positive loop + visual evidence
 npm run verify:ts7     # TS 7 smoke test: real typescript@7 diagnostics still parse (needs network)
 npm run self-check     # check fe-guard itself with its fast profile
 ```
 
-No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 135, v3 83, v4 69 — all passing; `npm test` passes 184, including the workflow contract (structured criteria, confirm / defer), manual evidence and gate snapshots, preflight, rework diff, lessons / distill, `task stats`, and package-level baseline (split, migration, `--show` / `--verify` / `--trend --package`, stale-root guard).
+No verification script **mocks anything**: they really spawn ESLint / tsc / dependency-cruiser / MCP subprocesses, create real files in temp git repos, install dependencies, run commands, and assert exit codes. Current measured results: v1 37 assertions, v2 135, v3 83, v4 80 — all passing; `npm test` passes 191, including the workflow contract (structured criteria, confirm / defer), manual evidence and gate snapshots, preflight (single and multi-step), visual diff, rework diff, lessons / distill, `task stats`, and package-level baseline (split, migration, `--show` / `--verify` / `--trend --package`, stale-root guard).
 
 If any step deviates from expectations, the script prints the expected value, the actual value, and the full output, then exits with code 1. See [CONTRIBUTING](../CONTRIBUTING.md) for the contribution guide.

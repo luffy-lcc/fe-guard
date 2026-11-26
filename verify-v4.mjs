@@ -19,6 +19,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { callTool } from './src/workflow/tools.js'
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url))
 const CLI = path.join(ROOT, 'bin', 'fe-guard.js')
@@ -526,6 +527,87 @@ step('8. package 级 baseline：按包收紧、互不影响')
   const show = cli(app, ['baseline', '--show', '--package', 'apps/a', '--json'])
   const single = JSON.parse(show.out)
   check('--show --package 指向 A 账本', show.code === 0 && single.path === 'apps/a/fe-guard.baseline.json', show.out)
+}
+
+// ================================================================ 9. 多步预检与视觉证据
+
+step('9. 多步预检与视觉证据：失败步骤可定位，视觉命令未跑通不算完成')
+{
+  const app = freshDir('visual-evidence')
+  writeText(path.join(app, 'src/util.mjs'), 'export const add = (a, b) => a + b\n')
+  writeText(path.join(app, 'preflight1.mjs'), "console.log('server ok')\n")
+  writeText(
+    path.join(app, 'preflight2.mjs'),
+    "import { existsSync, readFileSync } from 'node:fs'\nconst file = new URL('./.preflight-mode', import.meta.url)\nif (existsSync(file) && readFileSync(file, 'utf8').trim() === 'fail') { console.error('proxy down'); process.exit(4) }\nconsole.log('proxy ok')\n",
+  )
+  writeText(
+    path.join(app, 'visual.mjs'),
+    "import { existsSync, readFileSync } from 'node:fs'\nconst file = new URL('./.visual-mode', import.meta.url)\nif (existsSync(file) && readFileSync(file, 'utf8').trim() === 'fail') { console.error('视觉差异 2 处'); process.exit(2) }\nconsole.log('视觉对比通过')\n",
+  )
+  configOnly(
+    app,
+    {
+      metrics: { enabled: true, roots: ['src'], extensions: ['.mjs'] },
+    },
+    {
+      workflow: {
+        enabled: true,
+        gate: { mode: 'full' },
+        preflight: {
+          timeoutMs: 5000,
+          steps: [
+            { name: 'server', command: 'node preflight1.mjs' },
+            { name: 'proxy', command: 'node preflight2.mjs', timeoutMs: 3000 },
+          ],
+        },
+        visualDiff: { command: 'node visual.mjs', timeoutMs: 5000 },
+        distill: 'off',
+      },
+    },
+  )
+
+  writeText(path.join(app, '.preflight-mode'), 'fail\n')
+  const blockedStart = await callTool({ root: app, name: 'task_start', args: { title: '视觉任务', goal: '验证预检与视觉' } })
+  check('多步预检失败时指出具体步骤', blockedStart.ok === false && blockedStart.preflight.failedStep === 'proxy', JSON.stringify(blockedStart))
+  check('预检失败不创建任务', !existsSync(path.join(app, '.fe-guard/task.json')))
+
+  writeText(path.join(app, '.preflight-mode'), 'ok\n')
+  const started = await callTool({ root: app, name: 'task_start', args: { title: '视觉任务', goal: '验证预检与视觉' } })
+  check('多步预检通过并记录每步', started.ok === true && started.preflight.steps?.length === 2, JSON.stringify(started))
+
+  const criteria = await callTool({
+    root: app,
+    name: 'task_criteria',
+    args: {
+      criteria: [
+        { text: '首页视觉与设计稿一致', type: 'ui', source: '设计稿#首页', verify: 'gate', evidenceKind: 'diff' },
+      ],
+    },
+  })
+  check('视觉条件接受 evidenceKind=diff', criteria.ok === true, JSON.stringify(criteria))
+  await callTool({ root: app, name: 'task_plan', args: { steps: ['实现页面'] } })
+
+  writeText(path.join(app, '.visual-mode'), 'fail\n')
+  const failedGate = await callTool({ root: app, name: 'task_gate' })
+  check('视觉命令失败时门禁失败', failedGate.ok === false && failedGate.visualDiff?.ok === false, JSON.stringify(failedGate))
+  check(
+    '视觉失败给出 blocker',
+    failedGate.blockers?.some((item) => /视觉对比未通过/.test(item)),
+    JSON.stringify(failedGate.blockers),
+  )
+  check(
+    '视觉输出落盘并可读',
+    failedGate.visualDiff?.file && existsSync(path.join(app, failedGate.visualDiff.file)),
+    JSON.stringify(failedGate.visualDiff),
+  )
+  check('视觉条件未被失败证据覆盖', failedGate.completion?.achieved === 0, JSON.stringify(failedGate.completion))
+
+  writeText(path.join(app, '.visual-mode'), 'ok\n')
+  const passedGate = await callTool({ root: app, name: 'task_gate' })
+  check('视觉命令通过后交付', passedGate.ok === true && passedGate.stage === 'deliver', JSON.stringify(passedGate))
+  check('视觉条件被正确覆盖', passedGate.completion?.achieved === 1, JSON.stringify(passedGate.completion))
+  const snapshot = readJson(path.join(app, passedGate.evidencePath))
+  check('门禁快照包含视觉证据', snapshot.visualDiff?.ok === true && Boolean(snapshot.visualDiff.file), JSON.stringify(snapshot.visualDiff))
 }
 
 // ================================================================ 汇总

@@ -210,7 +210,7 @@ When you drive a task through the MCP workflow, each criterion is structured:
 
 - `type` is one of `ui` / `interaction` / `data` / `tracking` / `compat` / `performance`; `source` records where it came from. A guess becomes `source: "assumption: <reason>"`.
 - An `assumption` criterion needs a human: `npx fe-guard task confirm C2 --note "..." --yes`. Unconfirmed assumptions block delivery.
-- Prefer `testFile` when the criterion can be tested. Otherwise `verify: "manual"` needs an `evidenceFile` (screenshot notes, reconciliation record); the gate checks it exists and is non-empty and records bytes + sha256.
+- Prefer `testFile` when the criterion can be tested. Otherwise `verify: "manual"` needs an `evidenceFile` (screenshot notes, reconciliation record); the gate checks it exists and is non-empty and records bytes + sha256. Add `evidenceKind` (`screenshot` / `diff` / `log`) when the type is not obvious; for an automated visual check use `verify: "gate"` + `evidenceKind: "diff"` and configure `workflow.visualDiff.command`.
 - After a failed gate, record a retrospective with `task_lesson` (text + evidence + scope). `workflow.distill` defaults to `enforce`, so delivery waits for it; use `warn` / `off` only deliberately.
 - Progress is reported as "N done / M deferred" (plus remaining). Deferred criteria mark the delivery `degraded`; the tools never say "all done".
 
@@ -416,21 +416,21 @@ npm i -D fe-guard --registry https://npm.internal.example.com
 npx fe-guard --version
 ```
 
-Upgrade: `npm i -D fe-guard@0.5.0`. Rollback: `npm i -D fe-guard@0.4.0`. Commit `package-lock.json` in the project so everyone installs the same version.
+Upgrade: `npm i -D fe-guard@0.6.0`. Rollback: `npm i -D fe-guard@0.5.0`. Commit `package-lock.json` in the project so everyone installs the same version.
 
 ### Route B: install the tarball directly (works without a registry)
 
 ```sh
 # on the maintainer's machine
-npm pack                      # produces fe-guard-0.5.0.tgz
+npm pack                      # produces fe-guard-0.6.0.tgz
 # send the tgz to consumers via intranet file share / scp / shared directory
 
 # consuming project
-npm i -D ./fe-guard-0.5.0.tgz
+npm i -D ./fe-guard-0.6.0.tgz
 npx fe-guard --version
 ```
 
-Upgrade: once you have the new tgz, `npm i -D ./fe-guard-0.5.0.tgz`. Rollback: `npm i -D ./fe-guard-0.4.0.tgz` (just keep the old tgz in the shared directory).
+Upgrade: once you have the new tgz, `npm i -D ./fe-guard-0.6.0.tgz`. Rollback: `npm i -D ./fe-guard-0.5.0.tgz` (just keep the old tgz in the shared directory).
 
 `npm pack` includes only `bin/`, `src/`, `examples/`, `README.md`, `README.zh-CN.md`, `LICENSE`, `CHANGELOG.md` — no tests or verification scripts. npm restores the executable bit on `bin` automatically, so `npx fe-guard` runs directly after install.
 

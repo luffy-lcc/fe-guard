@@ -63,7 +63,10 @@ dependency-cruiser 的 JSON 不提供行号，只有「谁依赖了谁」。ESLi
 它们是人的决定：确认推断项、接受上线待办，都会改变「做完」的定义。做成 MCP 工具等于让模型自己批准。CLI 强制 `--note` / `--reason` 与 `--yes`，并在任务事件流里留下可审计记录。
 
 **preflight 命令写什么？失败怎么办？**
-写「不满足就不能相信后续验证」的前置条件，例如 `npm run check:env` 检查本地接口、生成类型或必需环境变量。失败时 `task_start` 不创建任务，`task_gate` 报「本次检查未执行」（不产证据、条件不被覆盖）。fe-guard 不会替你启动 dev server 或登录。
+写「不满足就不能相信后续验证」的前置条件，例如 `npm run check:env` 检查本地接口、生成类型或必需环境变量。需要分别检查 dev server、代理、登录态时用 `steps[]`，失败会指出具体步骤。失败时 `task_start` 不创建任务，`task_gate` 报「本次检查未执行」（不产证据、条件不被覆盖）。fe-guard 不会替你启动 dev server 或登录。
+
+**Trae 等 Agent 自己截图做视觉回归，会和 fe-guard 冲突吗？**
+不冲突。Agent 截图属于探索，可作为 `verify: manual` + `evidenceKind: "screenshot"` 的人工证据；声明为 `verify: gate` + `diff` 的条件仍要求项目自己的 `workflow.visualDiff.command`。命令的退出码、输出与哈希才是可审计证据，Agent 截图只是排查辅助，不能代替门禁通过。
 
 **失败门禁后为什么不能交付？怎么关闭？**
 `workflow.distill` 默认 `enforce`：最近一次失败门禁之后必须写 `task_lesson`（结论 + 证据 + scope）。改成 `warn` 可交付但标记 `degraded`，改成 `off` 则关闭要求。不要为了过门禁编一条假复盘。

@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0]
+
+### Added
+
+- **Multi-step preflight** (`workflow.preflight.steps[]`): 1–10 named commands, run in order and
+  stop at the first failure; the failed step is reported by name. The existing single `command`
+  form stays compatible; the two forms are mutually exclusive.
+- **`evidenceKind` for acceptance criteria** (`screenshot` / `diff` / `log`): manual evidence infers
+  the kind from the file extension, and `task status` / `task status --json` expose it.
+- **`workflow.visualDiff.command`**: runs the project's own visual comparison command once per gate
+  when a `verify: gate` criterion declares `evidenceKind: "diff"`. stdout / exit code / bytes /
+  sha256 are recorded under `.fe-guard/evidence/`; no browser or pixel-diff dependency is added.
+- Tests: `npm test` passes 191 and `verify-v4.mjs` reaches 80 assertions (v1 37 / v2 135 / v3 83 /
+  v4 80).
+
+### Changed
+
+- A visual criterion is covered only when `visualDiff.ok` is true. A missing command, timeout,
+  non-zero exit or failed evidence write leaves it pending and adds a blocker — even when
+  `workflow.stages.verify` is `warn`.
+- Preflight and visual commands are split on whitespace (no shell interpretation), matching
+  `workflow.gate.testCommand`.
+
 ## [0.5.0]
 
 ### Added

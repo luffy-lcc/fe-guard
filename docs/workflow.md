@@ -99,6 +99,7 @@ Every criterion is structured; a plain `{ text }` is rejected:
 | `verify` | no | `gate` / `test` / `manual`. Missing → `test` if `testFile`, `manual` if `evidenceFile`, otherwise `gate` |
 | `testFile` | no | Repo-relative test file; the gate really runs it and only a pass covers the criterion |
 | `evidenceFile` | no | Repo-relative manual evidence (screenshot notes, reconciliation records); the gate checks it exists and is non-empty |
+| `evidenceKind` | no | `screenshot` / `diff` / `log`; manual is inferred from the extension, gate only accepts `diff` (requires `workflow.visualDiff.command`) |
 
 ```json
 {
@@ -134,22 +135,57 @@ With 3 criteria, 2 covered and 1 deferred, the response says "2 done / 1 deferre
 
 Every gate writes `.fe-guard/evidence/<taskId>/<evidenceId>.json` with the mode, exit code, summary, completion, criteria tests, manual evidence, violation fingerprints and preflight result. `task_gate` returns `evidencePath`; `task_status` returns `lastEvidencePath` plus each evidence item's path. If the write fails, the gate result is unchanged but the path is `null`.
 
-`verify: manual` criteria record `{ file, bytes, sha256 }` — a fingerprint of the file at gate time (the same hash can later verify it was not replaced). That proves the file existed and was not swapped, but it does **not** prove the screenshot or note is semantically correct; visual judgement still needs a human or an external tool.
+`verify: manual` criteria record `{ file, bytes, sha256, kind }` — a fingerprint of the file at gate time (the same hash can later verify it was not replaced). `kind` is `screenshot` / `diff` / `log`; when omitted it is inferred from the extension (images → screenshot, `.diff/.patch` → diff, otherwise log). That proves the file existed and was not swapped, but it does **not** prove the screenshot or note is semantically correct; visual judgement still needs a human or an external tool.
+
+A `verify: gate` criterion with `evidenceKind: "diff"` is covered only by the visual comparison command: `visualDiff.ok === true` is required. A failed, missing or timed-out command never covers it, even when `workflow.stages.verify` is `warn`.
 
 `completion` is `{ achieved, total, remaining, deferred }`. Report "N done / M remaining" (plus deferred); never claim everything is done while `remaining` or `deferred` is non-empty.
 
 ## Environment preflight
 
+Single command (legacy form):
+
 ```json
 { "workflow": { "preflight": { "command": "npm run check:env", "timeoutMs": 60000 } } }
 ```
 
-An empty `command` (the default) disables preflight. When configured:
+Multiple steps:
 
-- `task_start` runs it first. Failure returns `ok:false` with the command, exit code and output tail, and **no task is created**.
+```json
+{
+  "workflow": {
+    "preflight": {
+      "timeoutMs": 60000,
+      "steps": [
+        { "name": "dev-server", "command": "curl -fsS http://127.0.0.1:5173", "timeoutMs": 5000 },
+        { "name": "api-proxy", "command": "curl -fsS http://127.0.0.1:5173/api/health" }
+      ]
+    }
+  }
+}
+```
+
+`command` and `steps` are mutually exclusive; `steps` accepts 1–10 named checks with unique names, and each step can override `timeoutMs`. Steps run in order and stop at the first failure, which is reported by name. No `command` and no `steps` means preflight is off.
+
+When configured:
+
+- `task_start` runs it first. Failure returns `ok:false` with the failed step, command, exit code and output tail, and **no task is created**.
 - `task_gate` runs it again. Failure appends `preflight.failed` and returns "environment preflight failed, this check was not executed": no evidence is written and criteria are not overwritten.
 
 The command is split on whitespace (no shell interpretation), like `workflow.gate.testCommand`. fe-guard only runs the command the project provides — it does not know about your dev server, proxy or login state.
+
+## Visual comparison: run the project's own command
+
+```json
+{ "workflow": { "visualDiff": { "command": "npm run visual:diff", "timeoutMs": 120000 } } }
+```
+
+- Runs only when at least one criterion has `verify: gate` + `evidenceKind: diff`; one run per gate covers all visual criteria.
+- Does not run when the check itself failed, avoiding a pointless external command.
+- stdout + stderr are written to `.fe-guard/evidence/<taskId>/<evidenceId>-visual.log`, with exit code, bytes and sha256.
+- Non-zero exit, missing command, timeout or failed evidence write leaves the criterion uncovered and adds a blocker; it is never a pass.
+- No browser is launched, no pixel diff is implemented, and no dependency is installed; Playwright / Chromatic / custom scripts all come from the project.
+- With no visual criteria it does not run and records `ran: false, reason: "no-visual-criteria"`.
 
 ## Rework diff: fixed vs introduced
 
@@ -189,9 +225,10 @@ A read-only aggregate of the current task plus `.fe-guard/tasks/` archives: task
 | Edit code without writing a contract | With no task, `task_plan` / `task_gate` error out and tell it to `task_start` first |
 | Write a plan without acceptance criteria | `task_plan` errors: criteria must come first |
 | Write a criterion without `type` / `source` | `task_criteria` rejects the call and names the missing fields |
-| Declare "achieved" itself | No such tool; `task_criteria` only accepts `id` / `text` / `type` / `source` / `verify` / `testFile` / `evidenceFile` — passing `achieved` is rejected |
+| Declare "achieved" itself | No such tool; `task_criteria` only accepts `id` / `text` / `type` / `source` / `verify` / `testFile` / `evidenceFile` / `evidenceKind` — passing `achieved` is rejected |
 | Attach a testFile but write no test / let the test fail | The gate really runs the test: missing file, failure, and timeout all block; the result is written into the evidence |
 | Declare a manual criterion but leave the evidence file missing or empty | The gate reports a blocker and does not cover the criterion |
+| Declare a visual criterion but never run / fail the visual command | The gate leaves the criterion uncovered; missing, timeout and non-zero exit all become blockers |
 | Leave an `assumption` criterion unconfirmed | The gate blocks delivery with the exact `task confirm` command |
 | Try to `confirm` / `defer` through MCP | No such tools exist — a human must run the CLI |
 | Claim "all done" after a `defer` | Completion returns "N done / M deferred"; the response never says "all done" |
@@ -239,6 +276,7 @@ For comparison: the same workflow written as natural-language rules typically co
     "gate": { "mode": "full", "testCommand": "node --test", "testTimeoutMs": 120000 },
     "stages": { "contract": "enforce", "plan": "enforce", "verify": "enforce" },
     "preflight": { "command": "", "timeoutMs": 60000 },
+    "visualDiff": { "command": "", "timeoutMs": 120000 },
     "distill": "enforce"
   }
 }
@@ -253,7 +291,8 @@ For comparison: the same workflow written as natural-language rules typically co
 | `workflow.stages.contract` | With `enforce`, criteria can only be written in the contract stage; `warn` allows adding them later; `off` imposes no restriction |
 | `workflow.stages.plan` | With `enforce`, the gate cannot run without a plan |
 | `workflow.stages.verify` | With `enforce`, a failed gate cannot cover acceptance criteria; `warn` allows coverage, but delivery is marked `degraded` |
-| `workflow.preflight.command` / `timeoutMs` | Optional environment preflight (default empty = off). A failure stops `task_start` and makes `task_gate` report "not executed" — never a pass |
+| `workflow.preflight.command` / `steps` / `timeoutMs` | Optional environment preflight (default empty = off). `command` and `steps` are mutually exclusive; a failure stops `task_start` and makes `task_gate` report "not executed" — never a pass |
+| `workflow.visualDiff.command` / `timeoutMs` | Optional visual comparison command (default empty = off). Only runs the project's own command, never a built-in browser; an unexecuted or failed command never covers a criterion with `evidenceKind: "diff"` |
 | `workflow.distill` | `enforce` (default) / `warn` / `off`: whether a lesson is required after a failed gate |
 
 `implement` / `deliver` have no separate switches: they are derived entirely from events, not decision points that can be widened.

@@ -14,7 +14,7 @@ import {
   reduce,
   saveTask,
 } from '../workflow/state.js'
-import { isAssumption, verifyMode } from '../workflow/criteria.js'
+import { evidenceKindOf, isAssumption, verifyMode } from '../workflow/criteria.js'
 import { collectStats } from '../workflow/statistics.js'
 import { loadConfig, stageLevel } from '../config.js'
 import { UserError } from '../utils.js'
@@ -127,9 +127,12 @@ function printStatus(root, state) {
   covered.forEach((item) => {
     const criterion = item.criterion
     const mark = item.status === 'covered' ? '✓' : item.status === 'deferred' ? '⏸' : '·'
-    const meta = `[${criterion.type ?? 'unknown'}/${verifyMode(criterion)}]`
+    const kind = evidenceKindOf(criterion)
+    const meta = `[${criterion.type ?? 'unknown'}/${verifyMode(criterion)}${kind ? `/${kind}` : ''}]`
     const test = criterion.testFile ? `  [test ${criterion.testFile}]` : ''
-    const evidenceFile = criterion.evidenceFile ? `  [evidence ${criterion.evidenceFile}]` : ''
+    const evidenceFile = criterion.evidenceFile
+      ? `  [evidence${kind ? ` ${kind}` : ''} ${criterion.evidenceFile}]`
+      : ''
     const tail =
       item.status === 'deferred'
         ? `  (待办：${clip(deferredReasons.get(criterion.id) ?? '', 80)})`
@@ -152,9 +155,26 @@ function printStatus(root, state) {
     console.log('复盘: 最近一次失败门禁后还没有复盘（在 AI IDE 里调用 task_lesson）')
   }
   if (state.preflight?.configured) {
-    console.log(`环境预检: ${state.preflight.ok ? '通过' : '未通过'}（${state.preflight.command}）`)
+    console.log(`环境预检: ${state.preflight.ok ? '通过' : '未通过'}（${preflightLabel(state.preflight)}）`)
+  }
+  const last = state.evidence.at(-1)
+  if (last?.visualDiff?.needed) {
+    const visual = last.visualDiff
+    console.log(
+      `视觉对比: ${visual.ok ? '通过' : visual.ran ? '未通过' : '未执行'}` +
+        `${visual.reason ? `（${visual.reason}）` : ''}` +
+        `${visual.file ? `，证据 ${visual.file}` : ''}`,
+    )
   }
   if (state.rejections > 0) console.log(`被拒绝的工具调用: ${state.rejections} 次（见 npx fe-guard task events）`)
+}
+
+/** 预检摘要：多步时列出步骤与失败点，单命令保持原样。 */
+function preflightLabel(preflight) {
+  if (!Array.isArray(preflight.steps) || preflight.steps.length === 0) return preflight.command
+  const summary = preflight.steps.map((step) => `${step.name}:${step.ok ? 'ok' : 'fail'}`).join(', ')
+  const failed = preflight.failedStep ? `，失败于 ${preflight.failedStep}` : ''
+  return `${summary}${failed}`
 }
 
 /** 只读统计：当前任务 + 归档，用数字看流程效果。 */

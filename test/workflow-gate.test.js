@@ -85,6 +85,7 @@ function cli(root, args) {
 test('workflow 配置：preflight 与 distill 的默认值与非法值', () => {
   const config = normalizeConfig({})
   assert.deepEqual(config.workflow.preflight, { command: '', timeoutMs: 60000 })
+  assert.deepEqual(config.workflow.visualDiff, { command: '', timeoutMs: 120000 })
   assert.equal(config.workflow.distill, 'enforce')
 
   const custom = normalizeConfig({
@@ -96,6 +97,42 @@ test('workflow 配置：preflight 与 distill 的默认值与非法值', () => {
   assert.throws(() => normalizeConfig({ workflow: { preflight: { command: true } } }), /preflight\.command/)
   assert.throws(() => normalizeConfig({ workflow: { preflight: { timeoutMs: 0 } } }), /preflight\.timeoutMs/)
   assert.throws(() => normalizeConfig({ workflow: { distill: 'sometimes' } }), /workflow\.distill/)
+})
+
+test('workflow 配置：preflight.steps 与 visualDiff 的归一化与互斥校验', () => {
+  const config = normalizeConfig({
+    workflow: {
+      preflight: {
+        timeoutMs: 5000,
+        steps: [
+          { name: 'server', command: ' node server.mjs ', timeoutMs: 1000 },
+          { name: 'proxy', command: 'node proxy.mjs' },
+        ],
+      },
+      visualDiff: { command: ' npm run visual:diff ', timeoutMs: 9000 },
+    },
+  })
+  assert.equal(config.workflow.preflight.command, '')
+  assert.deepEqual(config.workflow.preflight.steps, [
+    { name: 'server', command: 'node server.mjs', timeoutMs: 1000 },
+    { name: 'proxy', command: 'node proxy.mjs', timeoutMs: 5000 },
+  ])
+  assert.deepEqual(config.workflow.visualDiff, { command: 'npm run visual:diff', timeoutMs: 9000 })
+
+  assert.throws(
+    () => normalizeConfig({ workflow: { preflight: { command: 'node a.mjs', steps: [{ name: 'a', command: 'node a.mjs' }] } } }),
+    /二选一/,
+  )
+  assert.throws(() => normalizeConfig({ workflow: { preflight: { steps: [] } } }), /不能为空数组/)
+  assert.throws(
+    () => normalizeConfig({ workflow: { preflight: { steps: [{ name: 'a', command: 'node a.mjs' }, { name: 'a', command: 'node b.mjs' }] } } }),
+    /不能重复/,
+  )
+  assert.throws(
+    () => normalizeConfig({ workflow: { preflight: { steps: [{ name: 'a', command: 'node a.mjs', extra: true }] } } }),
+    /不接受字段/,
+  )
+  assert.throws(() => normalizeConfig({ workflow: { visualDiff: { command: true } } }), /visualDiff\.command/)
 })
 
 // ------------------------------------------------------------------ 环境预检
@@ -171,6 +208,46 @@ test('预检命令不可用时按 missing 处理，不开始任务', async () =>
   }
 })
 
+test('多步预检：失败步骤定位到 name，成功时记录每步结果', async () => {
+  const root = makeRepo()
+  try {
+    writeFileSync(path.join(root, 'step1.mjs'), "console.log('step1 ok')\n")
+    writeFileSync(
+      path.join(root, 'step2.mjs'),
+      "import { existsSync, readFileSync } from 'node:fs'\nconst file = new URL('./.step2-mode', import.meta.url)\nif (existsSync(file) && readFileSync(file, 'utf8').trim() === 'fail') { console.error('proxy down'); process.exit(5) }\nconsole.log('step2 ok')\n",
+    )
+    writeConfig(root, {
+      preflight: {
+        timeoutMs: 5000,
+        steps: [
+          { name: 'server', command: 'node step1.mjs' },
+          { name: 'proxy', command: 'node step2.mjs', timeoutMs: 3000 },
+        ],
+      },
+    })
+    writeFileSync(path.join(root, '.step2-mode'), 'fail\n')
+
+    const blocked = await callTool({ root, name: 'task_start', args: { title: 't', goal: 'g' } })
+    assert.equal(blocked.ok, false)
+    assert.equal(blocked.preflight.mode, 'steps')
+    assert.equal(blocked.preflight.failedStep, 'proxy')
+    assert.equal(blocked.preflight.exitCode, 5)
+    assert.match(blocked.preflight.output, /proxy down/)
+    assert.equal(loadTask(root).events.length, 0)
+    assert.equal(blocked.preflight.steps[0].name, 'server')
+    assert.equal(blocked.preflight.steps[0].ok, true)
+
+    writeFileSync(path.join(root, '.step2-mode'), 'ok\n')
+    const started = await callTool({ root, name: 'task_start', args: { title: 't', goal: 'g' } })
+    assert.equal(started.ok, true)
+    assert.equal(started.preflight.failedStep, null)
+    assert.deepEqual(started.preflight.steps.map((step) => step.ok), [true, true])
+    assert.match(started.preflight.steps[1].output, /step2 ok/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('task_gate 预检失败：本次检查不执行、不写证据、条件不被覆盖', async () => {
   const root = makeRepo()
   try {
@@ -205,6 +282,107 @@ test('task_gate 预检失败：本次检查不执行、不写证据、条件不�
     assert.ok(passed.evidencePath && existsSync(path.join(root, passed.evidencePath)))
   } finally {
     rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('视觉条件：命令失败不覆盖，修复后交付并落盘视觉证据', async () => {
+  const root = makeRepo()
+  try {
+    writeFileSync(
+      path.join(root, 'visual.mjs'),
+      "import { existsSync, readFileSync } from 'node:fs'\nconst file = new URL('./.visual-mode', import.meta.url)\nconst mode = existsSync(file) ? readFileSync(file, 'utf8').trim() : 'fail'\nif (mode === 'fail') { console.error('视觉差异 3 处'); process.exit(2) }\nconsole.log('视觉对比通过')\n",
+    )
+    writeConfig(root, { visualDiff: { command: 'node visual.mjs', timeoutMs: 5000 }, distill: 'off' })
+    await callTool({ root, name: 'task_start', args: { title: '视觉任务', goal: '验证视觉条件' } })
+    await callTool({
+      root,
+      name: 'task_criteria',
+      args: {
+        criteria: [
+          { text: '首页视觉与设计稿一致', type: 'ui', source: '设计稿#首页', verify: 'gate', evidenceKind: 'diff' },
+        ],
+      },
+    })
+    await callTool({ root, name: 'task_plan', args: { steps: ['实现页面'] } })
+
+    writeFileSync(path.join(root, '.visual-mode'), 'fail\n')
+    const failed = await callTool({ root, name: 'task_gate' })
+    assert.equal(failed.ok, false)
+    assert.equal(failed.visualDiff.ran, true)
+    assert.equal(failed.visualDiff.ok, false)
+    assert.equal(failed.visualDiff.exitCode, 2)
+    assert.ok(failed.visualDiff.file, '视觉输出应落盘')
+    assert.ok(existsSync(path.join(root, failed.visualDiff.file)))
+    assert.ok(failed.blockers.some((item) => /视觉对比未通过/.test(item)), JSON.stringify(failed.blockers))
+    assert.equal(failed.completion.achieved, 0)
+    assert.equal(failed.stage, 'verify')
+
+    writeFileSync(path.join(root, '.visual-mode'), 'ok\n')
+    const passed = await callTool({ root, name: 'task_gate' })
+    assert.equal(passed.ok, true)
+    assert.equal(passed.visualDiff.ok, true)
+    assert.equal(passed.completion.achieved, 1)
+    assert.equal(passed.stage, 'deliver')
+    assert.ok(passed.evidencePath && existsSync(path.join(root, passed.evidencePath)))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('视觉条件未配置 visualDiff.command：明确阻塞，不冒充通过', async () => {
+  const root = makeRepo()
+  try {
+    await callTool({ root, name: 'task_start', args: { title: '视觉任务', goal: '验证缺少命令' } })
+    await callTool({
+      root,
+      name: 'task_criteria',
+      args: {
+        criteria: [
+          { text: '视觉一致', type: 'ui', source: '设计稿', verify: 'gate', evidenceKind: 'diff' },
+        ],
+      },
+    })
+    await callTool({ root, name: 'task_plan', args: { steps: ['实现'] } })
+    const result = await callTool({ root, name: 'task_gate' })
+    assert.equal(result.ok, false)
+    assert.equal(result.visualDiff.reason, 'not-configured')
+    assert.ok(result.blockers.some((item) => /未配置 workflow\.visualDiff\.command/.test(item)))
+    assert.equal(result.completion.achieved, 0)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('视觉命令不可用或超时：按未执行处理，不覆盖条件', async () => {
+  const scenarios = [
+    { name: 'missing', visualDiff: { command: 'fe-guard-no-such-visual-xyz', timeoutMs: 5000 }, flag: 'missing' },
+    { name: 'timeout', visualDiff: { command: 'node slow-visual.mjs', timeoutMs: 120 }, flag: 'timedOut' },
+  ]
+  for (const scenario of scenarios) {
+    const root = makeRepo()
+    try {
+      writeFileSync(path.join(root, 'slow-visual.mjs'), 'setInterval(() => {}, 1000)\n')
+      writeConfig(root, { visualDiff: scenario.visualDiff, distill: 'off' })
+      await callTool({ root, name: 'task_start', args: { title: '视觉任务', goal: scenario.name } })
+      await callTool({
+        root,
+        name: 'task_criteria',
+        args: { criteria: [{ text: '视觉一致', type: 'ui', source: '设计稿', verify: 'gate', evidenceKind: 'diff' }] },
+      })
+      await callTool({ root, name: 'task_plan', args: { steps: ['实现'] } })
+
+      const result = await callTool({ root, name: 'task_gate' })
+      assert.equal(result.ok, false, scenario.name)
+      assert.equal(result.visualDiff.ok, false, scenario.name)
+      assert.equal(result.visualDiff[scenario.flag], true, scenario.name)
+      assert.equal(result.completion.achieved, 0, scenario.name)
+      assert.ok(
+        result.blockers.some((item) => /视觉对比未执行/.test(item)),
+        `${scenario.name}: ${JSON.stringify(result.blockers)}`,
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   }
 })
 

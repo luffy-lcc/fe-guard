@@ -100,6 +100,7 @@
     "gate": { "mode": "full", "testCommand": "node --test", "testTimeoutMs": 120000 },
     "stages": { "contract": "enforce", "plan": "enforce", "verify": "enforce" },
     "preflight": { "command": "", "timeoutMs": 60000 },
+    "visualDiff": { "command": "", "timeoutMs": 120000 },
     "distill": "enforce"
   }
 }
@@ -141,11 +142,12 @@
 | `feedback.path` | 误报记录（JSONL）的落盘路径。只追加、可审计，不会被 `check` 读取成忽略名单 |
 | `report.path` | 报告文件路径 |
 | `diff.base` | `--diff-only` 与大 diff 统计的比较基准，可改成 `origin/main` 之类 |
-| `workflow.preflight` | `{ command, timeoutMs }` 环境预检。`command` 为空（默认）= 关闭；配置后失败会让 `task_start` 不创建任务、`task_gate` 报「本次检查未执行」——不产证据、条件不被覆盖。`timeoutMs` 默认 60000 |
+| `workflow.preflight` | `{ command, timeoutMs }` 或 `{ steps, timeoutMs }` 环境预检。`command` 与 `steps` 二选一；为空（默认）= 关闭。多步按顺序执行、失败即停，错误指出具体步骤；失败会让 `task_start` 不创建任务、`task_gate` 报「本次检查未执行」——不产证据、条件不被覆盖 |
+| `workflow.visualDiff` | `{ command, timeoutMs }` 外部视觉对比命令。`command` 为空（默认）= 关闭；只执行项目自己的命令，不启动浏览器。门禁遇到 `evidenceKind: "diff"` 的条件时才执行，失败/缺失/超时都不会覆盖条件 |
 | `workflow.distill` | `enforce`（默认）/ `warn` / `off`。`enforce` 时最近一次失败门禁之后必须记录 `task_lesson` 才能交付；`warn` 允许交付但标记 `degraded`；`off` 关闭要求 |
 | `workflow.*` | 流程层开关，见[流程层开关](workflow.md#开关) |
 
-验收条件的字段（`type` / `source` / `verify` / `testFile` / `evidenceFile`）属于任务合同，不在这份配置里；见[验收条件](workflow.md#验收条件类型出处验收方式)。
+验收条件的字段（`type` / `source` / `verify` / `testFile` / `evidenceFile` / `evidenceKind`）属于任务合同，不在这份配置里；见[验收条件](workflow.md#验收条件类型出处验收方式)。
 
 `args` 里不要写目标文件/目录（例如 ESLint 的 `.`）：fe-guard 会在末尾自动追加全量目标或变更文件列表。
 

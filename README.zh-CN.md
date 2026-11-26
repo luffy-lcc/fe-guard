@@ -27,7 +27,8 @@ fe-guard 只做一件事：让「**不准更差**」自动执行。存量欠债�
 - **MCP 流程层**：事件溯源，阶段由事件推导，AI 无法自报「通过」；验收条件可挂测试，门禁真跑。
 - **结构化合同 + 人工决策**：每条条件必须有 `type`（ui / interaction / data / tracking / compat / performance）与 `source`；`assumption` 推断项必须由人 `task confirm`，人也可以 `task defer` 把条件转成上线待办——此时交付标 `degraded`，只报「N 完成 / M 待办」，不说「全部完成」。
 - **证据而不是口头声称**：每次门禁写快照到 `.fe-guard/evidence/<taskId>/<evidenceId>.json`；`verify: manual` 证据记录路径、字节数与 sha256；`completion` 给出 `achieved / total / remaining / deferred`。
-- **环境预检、返工对比与复盘**：`workflow.preflight.command` 环境不对就不开始，门禁也不会在未执行时假通过；门禁指纹返回 `fixed` / `introduced`；`task_lesson` + `workflow.distill` 要求失败门禁后必须复盘。
+- **环境预检、返工对比与复盘**：`workflow.preflight` 支持单命令或多步检查，环境不对就不开始，门禁也不会在未执行时假通过；门禁指纹返回 `fixed` / `introduced`；`task_lesson` + `workflow.distill` 要求失败门禁后必须复盘。
+- **视觉证据不绑定内置浏览器**：验收条件可声明 `evidenceKind`（`screenshot` / `diff` / `log`）；`workflow.visualDiff.command` 执行项目自己的视觉对比命令，记录输出、退出码与哈希。命令缺失或失败都不会覆盖条件。
 - **效果统计**：只读 `fe-guard task stats [--json]` 聚合交付/降级、门禁失败率、平均门禁次数、top blocker、复盘与待办数量。
 - **fast / full 两档**：钩子 3 秒内，合并前手动全档。
 - **诚实工程**：检查没真正执行就报 `not-executed`（不可入账），跳过 ≠ 通过，绝不假绿灯。

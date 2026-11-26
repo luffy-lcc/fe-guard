@@ -129,7 +129,7 @@ React / TSX 也在两个开源仓库上跑过，并修掉了真实问题：Story
 ## 五分钟接入
 
 ```bash
-npm i -D github:luffy-lcc/fe-guard#v0.5.0   # 或使用 Release 里的 tgz
+npm i -D github:luffy-lcc/fe-guard#v0.6.0   # 或使用 Release 里的 tgz
 npx fe-guard init      # 探测项目，生成配置、账本、AGENTS.md 与 MCP 配置
 npx fe-guard baseline  # 把现有存量记入账本
 npx fe-guard check     # 只拦新增

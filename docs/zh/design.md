@@ -80,8 +80,8 @@ fe-guard/
 │   ├── version.js               工具版本，SARIF / HTML / --version 共用
 │   ├── commands/                init / check / baseline（+ baseline-shared.js 内核）/ feedback / doctor / task
 │   ├── workflow/                流程核心：state.js（事件/阶段）/ definitions.js（工具 schema）/
-│   │                            criteria.js（type/source/verify）/ evidence.js（快照与指纹）/
-│   │                            gate.js / preflight.js / lessons.js / statistics.js / settings.js /
+│   │                            criteria.js（type/source/verify/evidenceKind）/ evidence.js（快照、指纹与视觉输出）/
+│   │                            gate.js / preflight.js / visual-diff.js / lessons.js / statistics.js / settings.js /
 │   │                            errors.js / tools.js（handler 注册与复用）/ tests.js（条件测试）
 │   ├── mcp/server.js            极简 MCP stdio server（零依赖，换行分隔 JSON-RPC）
 │   ├── ide/                     source.js（产物唯一事实源）/ tokens.js / artifacts.js（受管文件 + 5 个 MCP 客户端配置）
@@ -92,7 +92,7 @@ fe-guard/
 ├── verify.sh                    v1 一键真实验证（检查 + 棘轮）
 ├── verify-v2.mjs                v2 一键真实验证（MCP 协议 + 反例 + 生成物 + SARIF + ESLint ignore）
 ├── verify-v3.mjs                v3 一键真实验证（四项新检查的正反例 + 增量接入 + 单项关闭）
-├── verify-v4.mjs                v4 一键真实验证（monorepo / vue-tsc / 首次视图 / baseline / 误报 / 跨包边界）
+├── verify-v4.mjs                v4 一键真实验证（monorepo / vue-tsc / 首次视图 / baseline / 误报 / 跨包边界 / package 账本 / 视觉证据）
 └── verify-ts7.mjs               TypeScript 7 冒烟验证（非 Vue：真实 tsc 7 的诊断仍能解析）
 ```
 
@@ -106,11 +106,11 @@ npm run verify:local   # 本地一键：npm test + v1/v2/v3/v4 全部验证 + se
 npm run verify         # v1：临时目录复制样例工程，跑完整场景并断言退出码
 npm run verify:v2      # v2：真实 MCP 协议跑完整会话 + 反例 + 生成物
 npm run verify:v3      # v3：四项新检查的正反例 + 增量接入 + 单项关闭
-npm run verify:v4      # v4：monorepo 按包执行 + 植入 .vue 类型错误 + 首次视图 + 误报闭环
+npm run verify:v4      # v4：monorepo 按包执行 + 植入 .vue 类型错误 + 首次视图 + 误报闭环 + 视觉证据
 npm run verify:ts7     # TS 7 冒烟：真实 typescript@7 的诊断仍能解析（需要网络）
 npm run self-check     # 用 fe-guard 的 fast 档检查自己
 ```
 
-所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 135 项、v3 83 项、v4 69 项全部通过；`npm test` 184 项通过，包含工作流合同（结构化条件、confirm / defer）、手工证据与门禁快照、预检、返工对比、复盘 / distill、`task stats`，以及 package 级 baseline（拆账、迁移、`--show` / `--verify` / `--trend --package`、根账本 stale 防线）。
+所有验证脚本**不 mock**：真实 spawn ESLint / tsc / dependency-cruiser / MCP 子进程，在临时 git 仓库里真实建文件、装依赖、跑命令、断言退出码。当前实测：v1 37 项、v2 135 项、v3 83 项、v4 80 项全部通过；`npm test` 191 项通过，包含工作流合同（结构化条件、confirm / defer）、手工证据与门禁快照、单步/多步预检、视觉对比、返工对比、复盘 / distill、`task stats`，以及 package 级 baseline（拆账、迁移、`--show` / `--verify` / `--trend --package`、根账本 stale 防线）。
 
 任何一个环节不符合预期，脚本会打印期望值、实际值和完整输出，并以退出码 1 结束。贡献指南见 [CONTRIBUTING](../../CONTRIBUTING.md)。

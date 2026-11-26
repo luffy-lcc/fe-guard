@@ -11,7 +11,7 @@ fe-guard 只做一件事：让「不准更差」自动执行。这一页记录�
 - **0.3.0** — SARIF 输出、单文件 HTML 报告、`baseline --trend`、`task events --summary`。
 - **0.4.0（已完成）** — React/TSX 实机验证与 4 个真实问题修复；monorepo 跨包边界；结构化验收条件、`task confirm` / `task defer`、手工证据与门禁快照、环境预检、返工对比、`task_lesson` + `workflow.distill`、只读 `task stats`。
 
-## 0.5.0（已完成，当前最新）
+## 0.5.0（已完成）
 
 主题：**按 package 管理存量欠债**，让 monorepo 的 baseline 不再互相混淆。
 
@@ -27,26 +27,28 @@ fe-guard 只做一件事：让「不准更差」自动执行。这一页记录�
 
 0.5.0 不包含：package 模式下的 `--follow-renames`、迁移冲突自动合并；deps / ui / metrics / boundaries 的检查执行仍是根级一次（其中 metrics 的指标账本会按文件归属进入 package 账本）。
 
-## 0.6.0（规划中）
+## 0.6.0（已完成，当前发布版）
 
 主题：**验证环境与视觉证据的外部集成**。
 
-目标（规划，尚未实现）：
+已实现：
 
-1. `workflow.preflight` 支持多步命名检查 `steps[]`，保留现有单 `command` 形式的兼容。
-2. 手工 / 视觉证据增加 `evidenceKind`（`screenshot` / `diff` / `log`）与查看入口；视觉对比仍由项目自己的命令完成。
-3. 可选 `workflow.visualDiff.command`：只执行项目提供的命令，stdout / 退出码进入证据，不引入运行时依赖。
-4. 真实项目验证 + 中英文文档。
+1. `workflow.preflight` 支持多步命名检查 `steps[]`，与单 `command` 二选一；顺序执行、失败即停，错误指出具体步骤。
+2. 验收条件增加 `evidenceKind`（`screenshot` / `diff` / `log`）；manual 缺省按扩展名推断，gate 只接受 `diff`。
+3. `workflow.visualDiff.command`：只执行项目提供的命令，stdout / 退出码 / 哈希进入证据，不引入运行时依赖。
+4. 视觉条件只被 `visualDiff.ok` 覆盖；命令缺失、超时、非零退出都不算通过。
+5. 中英文文档与 `verify-v4` 场景同步。
 
-验收门槛：
+验收结果：
 
 - 现有单命令预检继续可用；`steps[]` 失败时能指出是哪一步。
-- `evidenceKind` 能被记录和读取，且不新增运行时依赖。
-- `workflow.visualDiff.command` 不启动浏览器、不安装依赖；命令缺失按「未执行」处理，绝不当作通过。
+- `evidenceKind` 已记录并在 `task status` / `task status --json` 中可读，且不新增运行时依赖。
+- `visualDiff.command` 不启动浏览器、不安装依赖；命令缺失按「未执行」处理，绝不当作通过。
+- 测试：`npm test` 191 全过；`verify-v4.mjs` 80 项断言（v1 37 / v2 135 / v3 83 / v4 80）。
 
-不包含：内置浏览器自动化、像素对比实现、移动端真机。
+不包含：内置浏览器自动化、像素对比实现、移动端真机、按条件映射多个视觉命令。
 
-维护与发布：0.4.x 只接收回归修复；0.5.0 已发布；npm 发布等有明确外部使用需求后再评估。
+维护与发布：0.5.x 只接收回归修复；0.6.0 已发布；npm 发布等有明确外部使用需求后再评估。
 
 ## 后续候选
 

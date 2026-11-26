@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { readJsonFile, toPosix, writeJsonFile, UserError } from '../utils.js'
-import { verifyMode } from './criteria.js'
+import { isVisualCriterion, verifyMode } from './criteria.js'
 
 export const TASK_FILE = '.fe-guard/task.json'
 export const ARCHIVE_DIR = '.fe-guard/tasks'
@@ -183,6 +183,8 @@ export function coverage(state, level = 'enforce') {
     const deferred = isDeferred(state, criterion)
     const evidence = state.evidence.find((item) => {
       if (item.seq <= criterion.seq || (strict && !item.ok)) return false
+      // 视觉条件必须由视觉命令的真实结果覆盖：命令没跑通不能算完成。
+      if (isVisualCriterion(criterion)) return item.visualDiff?.ok === true
       if (strict) {
         const mode = verifyMode(criterion)
         if (mode === 'test') {

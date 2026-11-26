@@ -68,6 +68,54 @@ test('验收条件必须带 type / source，且验收方式与字段一致', () 
   assert.equal(make({ text: 'x', type: 'ui', source: '需求' })[0].verify, 'gate')
 })
 
+test('evidenceKind：manual 按扩展名推断；gate 只允许 diff；test 不接受类型', () => {
+  const make = (item) => normalizeCriteriaList({ items: [item] })
+  const base = { text: 'x', type: 'ui', source: '需求' }
+
+  assert.equal(make({ ...base, evidenceFile: 'evidence/shot.png' })[0].evidenceKind, 'screenshot')
+  assert.equal(make({ ...base, evidenceFile: 'evidence/before.patch' })[0].evidenceKind, 'diff')
+  assert.equal(make({ ...base, evidenceFile: 'evidence/run.log' })[0].evidenceKind, 'log')
+  assert.equal(
+    make({ ...base, evidenceFile: 'evidence/run.txt', evidenceKind: 'screenshot' })[0].evidenceKind,
+    'screenshot',
+  )
+  assert.equal(
+    make({ ...base, verify: 'gate', evidenceKind: 'diff' })[0].evidenceKind,
+    'diff',
+  )
+
+  assert.throws(() => make({ ...base, evidenceKind: 'video' }), /evidenceKind/)
+  assert.throws(() => make({ ...base, verify: 'gate', evidenceKind: 'screenshot' }), /只接受 evidenceKind=diff/)
+  assert.throws(
+    () => make({ ...base, verify: 'test', testFile: 'test/a.mjs', evidenceKind: 'diff' }),
+    /test 不接受 evidenceKind/,
+  )
+})
+
+test('coverage：视觉条件只被 visualDiff.ok 的证据覆盖，warn 也不例外', () => {
+  const base = [
+    { type: 'task.started', taskId: 'T-1', title: 't', goal: 'g' },
+    {
+      type: 'criteria.declared',
+      criteria: [
+        { id: 'C1', text: '视觉一致', type: 'ui', source: '设计稿', verify: 'gate', evidenceKind: 'diff' },
+      ],
+    },
+    { type: 'plan.written', steps: ['s'] },
+  ]
+  const visual = (ok) => ({
+    type: 'gate.recorded',
+    evidence: { id: 'E1', ok: true, visualDiff: { needed: true, ran: true, ok } },
+  })
+
+  const failed = reduce(events([...base, visual(false)]))
+  assert.equal(coverage(failed, 'enforce')[0].status, 'pending')
+  assert.equal(coverage(failed, 'warn')[0].status, 'pending')
+
+  const passed = reduce(events([...base, visual(true)]))
+  assert.equal(coverage(passed, 'enforce')[0].status, 'covered')
+})
+
 test('task_criteria 返回 types / assumptions，全 UI 时给 warning 但不阻断', async () => {
   const root = makeRepo()
   try {

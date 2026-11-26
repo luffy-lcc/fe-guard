@@ -6,7 +6,10 @@ export const CRITERION_TYPES = ['ui', 'interaction', 'data', 'tracking', 'compat
 /** 验收方式：门禁证据 / 真实测试 / 手工证据。 */
 export const VERIFY_MODES = ['gate', 'test', 'manual']
 
-const ALLOWED_FIELDS = ['id', 'text', 'type', 'source', 'verify', 'testFile', 'evidenceFile']
+/** 证据类型：截图 / 视觉 diff / 日志。 */
+export const EVIDENCE_KINDS = ['screenshot', 'diff', 'log']
+
+const ALLOWED_FIELDS = ['id', 'text', 'type', 'source', 'verify', 'testFile', 'evidenceFile', 'evidenceKind']
 const MAX_ITEMS = 20
 
 const clip = (text, max) => {
@@ -27,6 +30,26 @@ export function verifyMode(criterion) {
   if (criterion?.testFile) return 'test'
   if (criterion?.evidenceFile) return 'manual'
   return 'gate'
+}
+
+/** 手工证据未显式声明类型时按扩展名推断，避免旧配置升级后全变成 log。 */
+export function inferEvidenceKind(file) {
+  const lower = String(file ?? '').toLowerCase()
+  if (/\.(png|jpe?g|webp|gif|bmp)$/.test(lower)) return 'screenshot'
+  if (/\.(diff|patch)$/.test(lower)) return 'diff'
+  return 'log'
+}
+
+/** 视觉条件：走 gate，但要求门禁执行 visualDiff.command 才算覆盖。 */
+export function isVisualCriterion(criterion) {
+  return verifyMode(criterion) === 'gate' && criterion?.evidenceKind === 'diff'
+}
+
+/** 条件有效证据类型：显式值优先，manual 未写时按文件扩展名推断。 */
+export function evidenceKindOf(criterion) {
+  if (criterion?.evidenceKind) return criterion.evidenceKind
+  if (verifyMode(criterion) === 'manual') return inferEvidenceKind(criterion?.evidenceFile)
+  return null
 }
 
 /** 按类型统计条件数量；历史事件缺少 type 的归入 unknown。 */
@@ -101,6 +124,25 @@ function normalizeCriterion(item, index, ids, cursor) {
     throw new Error('verify=gate 不接受 evidenceFile；要手工证据请用 verify=manual')
   }
 
+  let evidenceKind
+  if (item.evidenceKind !== undefined) {
+    evidenceKind = isText(item.evidenceKind) ? item.evidenceKind.trim() : ''
+    if (!EVIDENCE_KINDS.includes(evidenceKind)) {
+      throw new Error(
+        `验收条件 evidenceKind 只能是 ${EVIDENCE_KINDS.join(' / ')}，当前为 "${item.evidenceKind}"`,
+      )
+    }
+  }
+  if (verify === 'test' && evidenceKind) {
+    throw new Error('verify=test 不接受 evidenceKind：测试结果由门禁执行记录，不靠手写类型')
+  }
+  if (verify === 'gate' && evidenceKind && evidenceKind !== 'diff') {
+    throw new Error('verify=gate 只接受 evidenceKind=diff（视觉对比）；截图/日志请用 verify=manual')
+  }
+  if (verify === 'manual') {
+    evidenceKind = evidenceKind || inferEvidenceKind(item.evidenceFile)
+  }
+
   const testFile = hasTest ? checkRelativePath('testFile', item.testFile) : undefined
   const evidenceFile = hasEvidence ? checkRelativePath('evidenceFile', item.evidenceFile) : undefined
 
@@ -124,6 +166,7 @@ function normalizeCriterion(item, index, ids, cursor) {
     type,
     source,
     verify,
+    ...(evidenceKind ? { evidenceKind } : {}),
     ...(testFile ? { testFile } : {}),
     ...(evidenceFile ? { evidenceFile } : {}),
   }

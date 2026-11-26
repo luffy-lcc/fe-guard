@@ -1,4 +1,4 @@
-import { CRITERION_TYPES, VERIFY_MODES } from './criteria.js'
+import { CRITERION_TYPES, EVIDENCE_KINDS, VERIFY_MODES } from './criteria.js'
 
 /**
  * MCP 工具定义。schema 是流程的第一道硬约束：
@@ -54,6 +54,11 @@ export const TOOL_DEFINITIONS = [
               evidenceFile: {
                 type: 'string',
                 description: '可选：仓库内手工证据文件相对路径（截图说明、对账记录），门禁校验存在且非空',
+              },
+              evidenceKind: {
+                type: 'string',
+                enum: EVIDENCE_KINDS,
+                description: '可选：证据类型；manual 缺省按扩展名推断，gate 只接受 diff（要求 visualDiff.command）',
               },
             },
             required: ['text', 'type', 'source'],

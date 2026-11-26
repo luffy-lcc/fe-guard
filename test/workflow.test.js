@@ -103,6 +103,7 @@ test('工具集：数量 ≤ 8（v3 新增 ui_lookup），描述短，schema 拒
   const criteria = tools.find((tool) => tool.name === 'task_criteria')
   assert.deepEqual(Object.keys(criteria.inputSchema.properties.criteria.items.properties).sort(), [
     'evidenceFile',
+    'evidenceKind',
     'id',
     'source',
     'testFile',

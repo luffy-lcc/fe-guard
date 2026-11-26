@@ -32,7 +32,7 @@ export function normalizeWorkflow(raw = {}, source) {
 
   const preflight = raw.preflight ?? {}
   if (preflight === null || typeof preflight !== 'object' || Array.isArray(preflight)) {
-    throw new UserError(`${source} 中 workflow.preflight 必须是对象（{ command, timeoutMs }）`)
+    throw new UserError(`${source} 中 workflow.preflight 必须是对象（{ command, timeoutMs } 或 { steps, timeoutMs }）`)
   }
   // 空字符串 = 关闭预检；非字符串直接报错，避免把布尔值等误当成命令。
   if (preflight.command !== undefined && typeof preflight.command !== 'string') {
@@ -42,6 +42,25 @@ export function normalizeWorkflow(raw = {}, source) {
     preflight.timeoutMs,
     60000,
     'workflow.preflight.timeoutMs',
+    source,
+  )
+  const preflightSteps = normalizePreflightSteps(preflight.steps, preflightTimeoutMs, source)
+  const preflightCommand = (preflight.command ?? '').trim()
+  if (preflightSteps.length > 0 && preflightCommand) {
+    throw new UserError(`${source} 中 workflow.preflight.command 与 steps 只能二选一：多步请只写 steps`)
+  }
+
+  const visualDiff = raw.visualDiff ?? {}
+  if (visualDiff === null || typeof visualDiff !== 'object' || Array.isArray(visualDiff)) {
+    throw new UserError(`${source} 中 workflow.visualDiff 必须是对象（{ command, timeoutMs }）`)
+  }
+  if (visualDiff.command !== undefined && typeof visualDiff.command !== 'string') {
+    throw new UserError(`${source} 中 workflow.visualDiff.command 必须是字符串（留空表示关闭）`)
+  }
+  const visualDiffTimeoutMs = normalizeTimeout(
+    visualDiff.timeoutMs,
+    120000,
+    'workflow.visualDiff.timeoutMs',
     source,
   )
 
@@ -56,7 +75,51 @@ export function normalizeWorkflow(raw = {}, source) {
     enabled: raw.enabled !== false,
     gate: { mode, testCommand: testCommand.trim(), testTimeoutMs },
     stages,
-    preflight: { command: (preflight.command ?? '').trim(), timeoutMs: preflightTimeoutMs },
+    preflight: {
+      command: preflightCommand,
+      timeoutMs: preflightTimeoutMs,
+      ...(preflightSteps.length > 0 ? { steps: preflightSteps } : {}),
+    },
+    visualDiff: { command: (visualDiff.command ?? '').trim(), timeoutMs: visualDiffTimeoutMs },
     distill,
   }
+}
+
+/** 多步预检：顺序执行，失败即停；每步可用自己的 timeoutMs 覆盖默认值。 */
+function normalizePreflightSteps(value, defaultTimeoutMs, source) {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) {
+    throw new UserError(`${source} 中 workflow.preflight.steps 必须是数组`)
+  }
+  if (value.length === 0) {
+    throw new UserError(`${source} 中 workflow.preflight.steps 不能为空数组；关闭预检请留空 command`)
+  }
+  if (value.length > 10) {
+    throw new UserError(`${source} 中 workflow.preflight.steps 最多 10 步`)
+  }
+  const names = new Set()
+  return value.map((step, index) => {
+    if (!step || typeof step !== 'object' || Array.isArray(step)) {
+      throw new UserError(`${source} 中 workflow.preflight.steps[${index}] 必须是对象`)
+    }
+    const extra = Object.keys(step).filter((key) => !['name', 'command', 'timeoutMs'].includes(key))
+    if (extra.length > 0) {
+      throw new UserError(`${source} 中 workflow.preflight.steps[${index}] 不接受字段 ${extra.join(', ')}`)
+    }
+    const name = typeof step.name === 'string' ? step.name.trim() : ''
+    if (!name) throw new UserError(`${source} 中 workflow.preflight.steps[${index}].name 必须是非空字符串`)
+    if (names.has(name)) throw new UserError(`${source} 中 workflow.preflight.steps 的 name 不能重复：${name}`)
+    names.add(name)
+    const command = typeof step.command === 'string' ? step.command.trim() : ''
+    if (!command) {
+      throw new UserError(`${source} 中 workflow.preflight.steps[${index}].command 必须是非空字符串`)
+    }
+    const timeoutMs = normalizeTimeout(
+      step.timeoutMs,
+      defaultTimeoutMs,
+      `workflow.preflight.steps[${index}].timeoutMs`,
+      source,
+    )
+    return { name, command, timeoutMs }
+  })
 }

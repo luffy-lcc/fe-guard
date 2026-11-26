@@ -13,7 +13,7 @@ import {
   reduce,
   saveTask,
 } from './state.js'
-import { countByType, isAssumption, normalizeCriteriaList, verifyMode } from './criteria.js'
+import { countByType, evidenceKindOf, isAssumption, normalizeCriteriaList, verifyMode } from './criteria.js'
 import { testBlockers } from './tests.js'
 import { TOOL_DEFINITIONS, listTools } from './definitions.js'
 import { ToolError } from './errors.js'
@@ -31,6 +31,21 @@ const clip = (text, max) => {
 }
 
 const isText = (value) => typeof value === 'string' && value.trim().length > 0
+
+/** 状态查询只回传视觉对比的结论，不把整段 stdout 塞进上下文。 */
+function visualSummary(visualDiff) {
+  if (!visualDiff) return null
+  return {
+    configured: Boolean(visualDiff.configured),
+    needed: Boolean(visualDiff.needed),
+    ran: Boolean(visualDiff.ran),
+    ok: Boolean(visualDiff.ok),
+    ...(visualDiff.reason ? { reason: visualDiff.reason } : {}),
+    ...(visualDiff.command ? { command: visualDiff.command } : {}),
+    ...(visualDiff.exitCode !== undefined ? { exitCode: visualDiff.exitCode } : {}),
+    ...(visualDiff.file ? { file: visualDiff.file } : {}),
+  }
+}
 
 function assertKeys(args, allowed, tool) {
   for (const key of Object.keys(args)) {
@@ -198,6 +213,9 @@ async function taskNext({ root, config, args }) {
     if (!last?.ok) blockers.push(`最近一次门禁未通过（新增 ${last?.summary?.new ?? '?'} 条），需修复后重跑`)
     const missing = progress.remaining.map((item) => item.id)
     if (missing.length > 0) blockers.push(`未完成的条件：${missing.slice(0, 5).join(', ')}`)
+    if (last?.visualDiff?.needed && !last.visualDiff.ok) {
+      blockers.push('最近一次视觉对比未通过或未执行：先修复视觉命令，再重跑门禁')
+    }
     const assumptions = pendingAssumptions(state, level)
     if (assumptions.length > 0) {
       blockers.push(
@@ -258,6 +276,7 @@ async function taskStatus({ root, config, args }) {
       status: item.status,
       achievedBy: item.evidence?.id ?? null,
       ...(item.status === 'deferred' ? { deferReason: clip(deferredReasons.get(item.criterion.id) ?? '', 80) } : {}),
+      ...(evidenceKindOf(item.criterion) ? { evidenceKind: evidenceKindOf(item.criterion) } : {}),
       ...(item.criterion.testFile ? { testFile: item.criterion.testFile } : {}),
       ...(item.criterion.evidenceFile ? { evidenceFile: item.criterion.evidenceFile } : {}),
     })),
@@ -285,6 +304,7 @@ async function taskStatus({ root, config, args }) {
       summary: item.summary,
       ...(item.evidencePath ? { evidencePath: item.evidencePath } : {}),
       ...(item.manual?.length ? { manual: item.manual } : {}),
+      ...(item.visualDiff ? { visualDiff: visualSummary(item.visualDiff) } : {}),
       ...(item.trend ? { trend: item.trend } : {}),
     })),
     rejectedCalls: state.rejections,

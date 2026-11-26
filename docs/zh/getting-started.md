@@ -208,7 +208,7 @@ npx fe-guard false-positive --suggest   # 按规则给出降级/关闭建议
 
 - `type` 是 `ui` / `interaction` / `data` / `tracking` / `compat` / `performance` 之一；`source` 写明出处。推断项写成 `source: "assumption: 原因"`。
 - `assumption` 条件需要人确认：`npx fe-guard task confirm C2 --note "..." --yes`；未确认的推断项会阻止交付。
-- 能写成测试就挂 `testFile`；否则 `verify: "manual"` 必须有 `evidenceFile`（截图说明、对账记录），门禁会校验存在且非空，并记录字节数与 sha256。
+- 能写成测试就挂 `testFile`；否则 `verify: "manual"` 必须有 `evidenceFile`（截图说明、对账记录），门禁会校验存在且非空，并记录字节数与 sha256。类型不明显时加 `evidenceKind`（`screenshot` / `diff` / `log`）；自动化视觉检查用 `verify: "gate"` + `evidenceKind: "diff"`，并配置 `workflow.visualDiff.command`。
 - 门禁失败后用 `task_lesson` 写复盘（结论 + 证据 + scope）。`workflow.distill` 默认 `enforce`，不写复盘不能交付；确实不需要时才改 `warn` / `off`。
 - 进度口径是「N 完成 / M 待办」（以及未完成）；有待办时交付标记 `degraded`，工具不会说「全部完成」。
 
@@ -400,21 +400,21 @@ npm i -D fe-guard --registry https://npm.internal.example.com
 npx fe-guard --version
 ```
 
-升级：`npm i -D fe-guard@0.5.0`。回滚：`npm i -D fe-guard@0.4.0`。建议在项目里提交 `package-lock.json`，保证每个人装到同一版。
+升级：`npm i -D fe-guard@0.6.0`。回滚：`npm i -D fe-guard@0.5.0`。建议在项目里提交 `package-lock.json`，保证每个人装到同一版。
 
 ### 路线 B：tarball 直接装（没有 registry 也能用）
 
 ```sh
 # 维护者机器上
-npm pack                      # 产出 fe-guard-0.5.0.tgz
+npm pack                      # 产出 fe-guard-0.6.0.tgz
 # 把 tgz 通过内网网盘 / scp / 共享目录发给使用方
 
 # 使用方项目
-npm i -D ./fe-guard-0.5.0.tgz
+npm i -D ./fe-guard-0.6.0.tgz
 npx fe-guard --version
 ```
 
-升级：拿到新 tgz 后 `npm i -D ./fe-guard-0.5.0.tgz`。回滚：`npm i -D ./fe-guard-0.4.0.tgz`（旧 tgz 保留在共享目录即可）。
+升级：拿到新 tgz 后 `npm i -D ./fe-guard-0.6.0.tgz`。回滚：`npm i -D ./fe-guard-0.5.0.tgz`（旧 tgz 保留在共享目录即可）。
 
 `npm pack` 只包含 `bin/`、`src/`、`examples/`、`README.md`、`README.zh-CN.md`、`LICENSE`、`CHANGELOG.md`，不包含测试与验证脚本；`bin` 的执行位由 npm 自动恢复，安装后 `npx fe-guard` 可直接运行。
 

@@ -63,7 +63,10 @@ A plain text list lets a task look complete while whole categories are missing, 
 They are human decisions: confirming an assumption or accepting a release todo changes what "done" means. As MCP tools the model could approve itself. The CLI requires `--note` / `--reason` and `--yes`, and leaves an auditable event in the task stream.
 
 **What should the preflight command do? What if it fails?**
-Put whatever must be true before verification is meaningful — for example `npm run check:env` verifying a local API, generated types or required environment variables. If it fails, `task_start` creates no task and `task_gate` reports "this check was not executed" (no evidence, criteria not covered). fe-guard never starts your dev server or logs in for you.
+Put whatever must be true before verification is meaningful — for example `npm run check:env` verifying a local API, generated types or required environment variables. Use `steps[]` when you need named checks (dev server, proxy, login state) so a failure tells you which one broke. If it fails, `task_start` creates no task and `task_gate` reports "this check was not executed" (no evidence, criteria not covered). fe-guard never starts your dev server or logs in for you.
+
+**Does visual regression conflict with screenshots taken by Trae or another agent?**
+No. Agent screenshots are exploration and can be attached as `verify: manual` + `evidenceKind: "screenshot"`; a `verify: gate` + `diff` criterion still requires the project's own `workflow.visualDiff.command`. The command's exit code, output and hash are the auditable evidence; the agent's screenshot is a debugging aid, not a pass.
 
 **Why can't I deliver after a failed gate? How do I turn it off?**
 `workflow.distill` defaults to `enforce`: after the last failed gate, a `task_lesson` (text + evidence + scope) is required. Set it to `warn` to allow delivery marked `degraded`, or `off` to disable the requirement. Don't write a fake lesson just to pass.

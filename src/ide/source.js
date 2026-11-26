@@ -83,6 +83,7 @@ ${numbered(FLOW_STEPS)}
 | \`verify\` | 否 | gate / test / manual；缺省按 testFile→test、evidenceFile→manual、否则 gate |
 | \`testFile\` | 否 | 仓库内测试文件相对路径；门禁真跑，通过才覆盖该条件 |
 | \`evidenceFile\` | 否 | 仓库内手工证据相对路径；门禁校验存在且非空，并记录 bytes + sha256 |
+| \`evidenceKind\` | 否 | screenshot / diff / log；manual 可按扩展名推断，gate 只接受 diff |
 
 全部条件都是 \`ui\` 时返回 warning：检查是否漏了交互、数据、埋点、兼容或性能类条件。
 
@@ -99,7 +100,7 @@ MCP **没有** confirm / defer 工具，这两个决定必须由人执行：
 - \`verify: manual\` 只证明有落盘证据（路径 + 字节数 + sha256），不判断截图或记录内容是否正确。
 - \`completion: { achieved, total, remaining, deferred }\`：只报「N 完成 / M 待办」，禁止「全部完成」「其余正常」。
 - \`trend: { previousNew, fixed, introduced }\`：上一轮失败后仍引入新违规时，先排查是不是改坏了。
-- \`workflow.preflight.command\` 失败 = 本次检查未执行：不产证据、不覆盖条件，不能当成通过。
+- \`workflow.preflight.command\` 失败 = 本次检查未执行：不产证据、不覆盖条件，不能当成通过；多步写 \`steps\`，错误会指出具体步骤。
 - 最近一次失败门禁之后必须有 \`task_lesson\` 复盘；\`workflow.distill\` 默认 \`enforce\`，\`warn\` 仅降级，\`off\` 关闭。
 
 ## 查询与只读工具（随时可用）

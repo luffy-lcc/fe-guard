@@ -99,6 +99,7 @@ AI 按 blockers 去修，再调一次 `task_gate`。工具不会回传整份日�
 | `verify` | 否 | `gate` / `test` / `manual`；缺省按 testFile→test、evidenceFile→manual、否则 gate |
 | `testFile` | 否 | 仓库内测试文件相对路径；门禁真跑，通过才覆盖该条件 |
 | `evidenceFile` | 否 | 仓库内手工证据相对路径（截图说明、对账记录）；门禁校验存在且非空 |
+| `evidenceKind` | 否 | `screenshot` / `diff` / `log`；manual 缺省按扩展名推断，gate 只接受 `diff`（要求配置 `workflow.visualDiff.command`） |
 
 ```json
 {
@@ -134,22 +135,57 @@ npx fe-guard task defer C3 --reason "后端接口还没联调" --yes
 
 每次门禁写 `.fe-guard/evidence/<taskId>/<evidenceId>.json`，包含模式、退出码、汇总、完成度、条件测试、手工证据、违规指纹与预检结果。`task_gate` 返回 `evidencePath`；`task_status` 返回 `lastEvidencePath` 以及每条证据的路径。写入失败时门禁结论不变，但路径为 `null`。
 
-`verify: manual` 的条件记录 `{ file, bytes, sha256 }`，即门禁当时文件内容的指纹（事后可用同一 hash 核对是否被替换）。这只证明文件存在且内容未被替换，**不证明**截图或记录内容正确；视觉判断仍需人或外部工具。
+`verify: manual` 的条件记录 `{ file, bytes, sha256, kind }`，即门禁当时文件内容的指纹（事后可用同一 hash 核对是否被替换）。`kind` 为 `screenshot` / `diff` / `log`，未显式声明时按扩展名推断（图片 → screenshot，`.diff/.patch` → diff，其余 → log）。这只证明文件存在且内容未被替换，**不证明**截图或记录内容正确；视觉判断仍需人或外部工具。
+
+`verify: gate` + `evidenceKind: "diff"` 的条件由视觉对比命令覆盖：只有 `visualDiff.ok === true` 才算完成，命令失败、缺失或超时都不会覆盖，即使 `workflow.stages.verify` 是 `warn`。
 
 `completion` 是 `{ achieved, total, remaining, deferred }`。汇报用「N 完成 / M 待办」；只要 `remaining` 或 `deferred` 非空，就不能说全部完成。
 
 ## 环境预检
 
+单命令写法（兼容旧配置）：
+
 ```json
 { "workflow": { "preflight": { "command": "npm run check:env", "timeoutMs": 60000 } } }
 ```
 
-`command` 为空（默认）即关闭。配置后：
+多步写法：
 
-- `task_start` 先执行；失败返回 `ok:false`，带命令、退出码与输出尾部，且**不会创建任务**。
+```json
+{
+  "workflow": {
+    "preflight": {
+      "timeoutMs": 60000,
+      "steps": [
+        { "name": "dev-server", "command": "curl -fsS http://127.0.0.1:5173", "timeoutMs": 5000 },
+        { "name": "api-proxy", "command": "curl -fsS http://127.0.0.1:5173/api/health" }
+      ]
+    }
+  }
+}
+```
+
+`command` 与 `steps` 二选一；`steps` 1–10 步、`name` 不重复，每步可单独设 `timeoutMs`（缺省用顶层值）。多步按顺序执行，失败即停，错误会指出具体步骤。未配置（`command` 为空且没有 `steps`）即关闭。
+
+配置后：
+
+- `task_start` 先执行；失败返回 `ok:false`，带失败步骤、命令、退出码与输出尾部，且**不会创建任务**。
 - `task_gate` 再执行；失败会追加 `preflight.failed`，返回「环境预检未通过，本次检查未执行」：不写证据、不覆盖条件。
 
 命令按空白拆分（不做 shell 解释），与 `workflow.gate.testCommand` 一致。fe-guard 只执行项目自己提供的命令，不知道 dev server、代理或登录态。
+
+## 视觉对比：只执行项目自己的命令
+
+```json
+{ "workflow": { "visualDiff": { "command": "npm run visual:diff", "timeoutMs": 120000 } } }
+```
+
+- 只有存在 `verify: gate` + `evidenceKind: diff` 的条件时才执行；同一次门禁只跑一次，结果覆盖所有视觉条件。
+- 检查本身未通过时不执行，避免无意义的外部命令。
+- stdout + stderr 落盘到 `.fe-guard/evidence/<taskId>/<evidenceId>-visual.log`，记录退出码、字节数和 sha256。
+- 命令非零、缺失、超时或证据写入失败 → 条件未覆盖，并给出 blocker；绝不判通过。
+- 不启动浏览器、不做像素对比、不安装依赖；Playwright / Chromatic / 自研脚本都由项目提供。
+- 没有视觉条件时不执行，并在证据里记录 `ran: false, reason: "no-visual-criteria"`。
 
 ## 返工对比：修好与改坏
 
@@ -189,9 +225,10 @@ npx fe-guard task stats --json
 | 不写合同直接改代码 | 没有任务时 `task_plan` / `task_gate` 报错，提示先 `task_start` |
 | 不写验收条件就写计划 | `task_plan` 报错：必须先写条件 |
 | 条件不写 `type` / `source` | `task_criteria` 拒绝调用，并指出缺哪些字段 |
-| 自己宣布「已达成」 | 没有这个工具；`task_criteria` 只收 `id` / `text` / `type` / `source` / `verify` / `testFile` / `evidenceFile`，传 `achieved` 被拒 |
+| 自己宣布「已达成」 | 没有这个工具；`task_criteria` 只收 `id` / `text` / `type` / `source` / `verify` / `testFile` / `evidenceFile` / `evidenceKind`，传 `achieved` 被拒 |
 | 挂了 testFile 却不写测试 / 测试失败 | 门禁真跑测试：文件缺失、失败、超时都拦住，结果写进证据 |
 | 声明手工条件但证据文件缺失或为空 | 门禁报 blocker，该条件不被覆盖 |
+| 声明视觉条件但视觉命令没跑 / 失败 | 门禁不覆盖该条件；缺失、超时、非零退出都列为 blocker |
 | 推断项不确认就想交付 | 门禁拦住并给出确切的 `task confirm` 命令 |
 | 想通过 MCP 执行 `confirm` / `defer` | 没有这两个工具——必须由人跑 CLI |
 | defer 之后宣称「全部完成」 | 完成度返回「N 完成 / M 待办」，响应里不会出现「全部完成」 |
@@ -239,6 +276,7 @@ npx fe-guard task stats --json
     "gate": { "mode": "full", "testCommand": "node --test", "testTimeoutMs": 120000 },
     "stages": { "contract": "enforce", "plan": "enforce", "verify": "enforce" },
     "preflight": { "command": "", "timeoutMs": 60000 },
+    "visualDiff": { "command": "", "timeoutMs": 120000 },
     "distill": "enforce"
   }
 }
@@ -253,7 +291,8 @@ npx fe-guard task stats --json
 | `workflow.stages.contract` | `enforce` 时条件只能在合同阶段写；`warn` 允许后补；`off` 不限 |
 | `workflow.stages.plan` | `enforce` 时没有计划不能跑门禁 |
 | `workflow.stages.verify` | `enforce` 时失败的门禁不能覆盖验收条件；`warn` 允许覆盖，但交付会标 `degraded` |
-| `workflow.preflight.command` / `timeoutMs` | 可选的环境预检（默认空 = 关闭）。失败会让 `task_start` 不创建任务、`task_gate` 报「本次检查未执行」，绝不假通过 |
+| `workflow.preflight.command` / `steps` / `timeoutMs` | 可选的环境预检（默认空 = 关闭）。`command` 与 `steps` 二选一；失败会让 `task_start` 不创建任务、`task_gate` 报「本次检查未执行」，绝不假通过 |
+| `workflow.visualDiff.command` / `timeoutMs` | 可选的视觉对比命令（默认空 = 关闭）。只执行项目自己的命令，不内置浏览器；未执行/失败都不会覆盖 `evidenceKind: "diff"` 的条件 |
 | `workflow.distill` | `enforce`（默认）/ `warn` / `off`：失败门禁后是否必须复盘 |
 
 `implement` / `deliver` 没有独立开关：它们完全由事件推导，不是一个可以被放宽的判定点。

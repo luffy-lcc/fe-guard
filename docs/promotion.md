@@ -129,7 +129,7 @@ Zero runtime dependencies, Node 18+, installation size is just the source files.
 ## Five-minute setup
 
 ```bash
-npm i -D github:luffy-lcc/fe-guard#v0.5.0   # or the tarball from Releases
+npm i -D github:luffy-lcc/fe-guard#v0.6.0   # or the tarball from Releases
 npx fe-guard init      # probe the project; write config, ledger, AGENTS.md and MCP configs
 npx fe-guard baseline  # record existing debt
 npx fe-guard check     # block only what is new

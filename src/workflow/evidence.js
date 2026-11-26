@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { toPosix } from '../utils.js'
+import { evidenceKindOf } from './criteria.js'
 
 export const EVIDENCE_DIR = '.fe-guard/evidence'
 export const MAX_FINGERPRINTS = 100
@@ -24,16 +25,17 @@ export function collectManualEvidence({ root, criteria = [] }) {
   return targets.map((criterion) => {
     const criterionId = criterion.id
     const file = criterion.evidenceFile
-    if (!file) return { criterionId, file: null, ok: false, reason: 'missing-file' }
+    const kind = evidenceKindOf(criterion)
+    if (!file) return { criterionId, file: null, kind, ok: false, reason: 'missing-file' }
     const absolute = path.join(root, file)
-    if (!existsSync(absolute)) return { criterionId, file, ok: false, reason: 'missing' }
+    if (!existsSync(absolute)) return { criterionId, file, kind, ok: false, reason: 'missing' }
     try {
       const buffer = readFileSync(absolute)
-      if (buffer.length === 0) return { criterionId, file, ok: false, bytes: 0, reason: 'empty' }
+      if (buffer.length === 0) return { criterionId, file, kind, ok: false, bytes: 0, reason: 'empty' }
       const sha256 = createHash('sha256').update(buffer).digest('hex')
-      return { criterionId, file, ok: true, bytes: buffer.length, sha256 }
+      return { criterionId, file, kind, ok: true, bytes: buffer.length, sha256 }
     } catch {
-      return { criterionId, file, ok: false, reason: 'unreadable' }
+      return { criterionId, file, kind, ok: false, reason: 'unreadable' }
     }
   })
 }
@@ -91,6 +93,7 @@ export function buildGateEvidence({
   reportPath,
   preflight,
   trend,
+  visualDiff,
 }) {
   const summary = {
     known: report.summary.known,
@@ -98,7 +101,7 @@ export function buildGateEvidence({
     newErrors: report.summary.newErrors,
   }
   // trend 只在存在上一轮证据时才有意义；preflight 每次门禁都记录（未配置也会写清）。
-  const extras = { preflight, ...(trend ? { trend } : {}) }
+  const extras = { preflight, ...(trend ? { trend } : {}), ...(visualDiff ? { visualDiff } : {}) }
   const evidencePath = writeEvidenceSnapshot({
     root,
     taskId,
@@ -136,14 +139,48 @@ export function buildGateEvidence({
   return { evidence, evidencePath, summary }
 }
 
+/** 视觉对比输出落盘：与门禁快照放同一目录，便于按任务/证据 ID 追溯。 */
+export function writeEvidenceOutput({ root, taskId, evidenceId, text, suffix = 'visual' }) {
+  const safeTaskId = sanitize(taskId, 'unknown')
+  const safeEvidenceId = sanitize(evidenceId, 'E1')
+  const relative = path.join(EVIDENCE_DIR, safeTaskId, `${safeEvidenceId}-${suffix}.log`)
+  try {
+    const file = path.join(root, relative)
+    const body = `${String(text ?? '')}`
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, body, 'utf8')
+    return {
+      file: toPosix(relative),
+      bytes: Buffer.byteLength(body),
+      sha256: createHash('sha256').update(body).digest('hex'),
+    }
+  } catch {
+    return null
+  }
+}
+
 /** 手工证据缺失或为空时给模型的 blocker（只给方向，不阻塞门禁结论本身）。 */
 export function manualEvidenceBlockers(manual = []) {
   return manual
     .filter((item) => !item.ok)
     .map(
       (item) =>
-        `手工证据 ${item.criterionId} 不可用：${item.file ?? '(未提供)'}（${MANUAL_REASONS[item.reason] ?? item.reason}）`,
+        `手工证据 ${item.criterionId}${item.kind ? `（${item.kind}）` : ''} 不可用：${item.file ?? '(未提供)'}（${MANUAL_REASONS[item.reason] ?? item.reason}）`,
     )
+}
+
+/** 视觉对比的 blocker：只列可行动的原因，不把整段日志塞进上下文。 */
+export function visualDiffBlockers(visualDiff) {
+  if (!visualDiff || !visualDiff.needed) return []
+  if (visualDiff.ok) return []
+  if (visualDiff.reason === 'not-configured') {
+    return ['视觉条件要求 evidenceKind=diff，但未配置 workflow.visualDiff.command']
+  }
+  if (visualDiff.reason === 'check-failed') return ['视觉对比未执行：门禁检查未通过']
+  if (visualDiff.missing) return [`视觉对比未执行：命令不可用（${visualDiff.command}）`]
+  if (visualDiff.timedOut) return [`视觉对比未执行：命令超时（${visualDiff.command}）`]
+  if (visualDiff.reason === 'evidence-write-failed') return ['视觉对比未执行：证据文件写入失败']
+  return [`视觉对比未通过：${visualDiff.command}（退出码 ${visualDiff.exitCode}）`]
 }
 
 /**

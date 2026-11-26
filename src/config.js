@@ -55,6 +55,8 @@ export function defaultConfig() {
       stages: { contract: 'enforce', plan: 'enforce', verify: 'enforce' },
       // 环境预检默认关闭（空命令）；配置后失败会导致开始/门禁直接失败。
       preflight: { command: '', timeoutMs: 60000 },
+      // 视觉对比默认关闭；配置后只执行项目自己的命令，不内置浏览器/像素对比。
+      visualDiff: { command: '', timeoutMs: 120000 },
       // 失败门禁之后是否必须复盘：enforce 拦截交付，warn 仅标记 degraded，off 关闭。
       distill: 'enforce',
     },

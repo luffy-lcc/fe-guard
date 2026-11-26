@@ -19,6 +19,24 @@ fe-guard 编排已有的 ESLint、tsc、dependency-cruiser，把输出归一化�
 
 fe-guard 只做一件事：让「**不准更差**」自动执行。存量欠债冻结、不要求一次还清；新增违规必失败；修掉旧违规后 baseline 自动收紧，不会变松。
 
+## 60 秒看懂
+
+- **把已有的 lint / tsc / dependency-cruiser 变成一条只拦新增的门禁。** 历史欠债冻结进 baseline，修掉后账本自动收紧。
+- **把 AI 的「完成了」变成可核对的门禁证据。** MCP 工具推进「合同 → 验收条件 → 计划 → 实现 → 验证 → 交付」，模型不能自己把阶段标成通过。
+- **绝不假绿灯。** 没执行的检查记为 `not-executed`，永远不能进 baseline；跳过不等于通过。
+
+![fe-guard 的两层](./docs/assets/overview.zh.svg)
+
+*检查层回答「有没有变坏」，工作流层回答「有没有做完」。*
+
+| 你遇到的 | fe-guard 怎么做 |
+| --- | --- |
+| 全量 lint 一开就红，只能关掉检查 | 冻结存量，只拦新增 |
+| AI 声称完成，却没有证据 | MCP 流程 + 门禁证据 + 完成度 |
+| 重复组件、依赖膨胀、文件腐化 | 四项内置检查 + 组件按需查询 |
+
+不适合只改一行文案的小改动、不愿把 baseline 账本纳入评审的团队，或期待自动修复 / 语义级架构评审的人。想看完整图解？见[项目定位与图解](docs/zh/promotion.md)。
+
 ## 特性
 
 - **零运行时依赖**，Node 18+，ESM，安装体积就是几份源码。
@@ -62,12 +80,15 @@ npx fe-guard check --staged --profile fast
 
 AI 获得 7 个 `task_*` 工具 + `ui_lookup`，必须调用工具推进「合同 → 验收条件 → 计划 → 实现 → 验证 → 交付」。阶段判定在代码里，无法自报「通过」。macOS GUI 应用不加载 shell PATH——nvm/fnm 下请把 `command`/`args` 改成绝对路径（[常见问题](docs/zh/faq.md)）。
 
+不需要额外安装 Skill：`init` 已写入常驻规则、斜杠命令和 MCP 配置。Skill 是可选的引导层，判定仍在 MCP 工具与退出码里（[详见](docs/zh/workflow.md)）。
+
 完整流程：[workflow](docs/zh/workflow.md)。
 
 ## 文档
 
 | 主题 | 链接 |
 | --- | --- |
+| 项目定位、图解与完整叙事 | [promotion](docs/zh/promotion.md) |
 | 快速上手 / 常用命令 / doctor / 内网分发 | [getting-started](docs/zh/getting-started.md) |
 | 七项检查与检测原理 | [checks](docs/zh/checks.md) |
 | baseline 棘轮 / 档位 / 退出码 | [baseline](docs/zh/baseline.md) |

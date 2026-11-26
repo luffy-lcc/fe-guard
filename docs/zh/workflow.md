@@ -12,6 +12,43 @@
 - 硬规则写在**代码**里。没有「把阶段标记为通过」的工具，模型输出什么都无法让任务进入交付态。
 - 生成出来的规则文件只留最短的那部分非标准约定（AGENTS.md 片段约 591 token，上限 600）。
 
+![一次任务从合同走到交付](../assets/flow.zh.svg)
+
+*图：合同 → 验收条件 → 计划 → 实现 → 门禁 → 交付；每一步都有 Gate。*
+
+## Skills、规则与 MCP：各管什么
+
+fe-guard 不要求安装任何 Skill。`init` 生成的是常驻规则、斜杠命令和 MCP 配置；Skill 是可选的说明书，不是判定层。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+flowchart LR
+  subgraph GUIDE["引导层：帮助模型理解"]
+    R["常驻规则：AGENTS.md / IDE rules"] --> C["斜杠命令：/fe-guard-next、/fe-guard-gate"]
+    C --> S["Skill（可选）：按需讲解、诊断"]
+  end
+  subgraph HARD["判定层：决定能不能交付"]
+    M["MCP tools：7 个 task_* + ui_lookup"] --> E["门禁证据 / completion"]
+    CI["commit / CI：check 退出码"] --> E
+  end
+  GUIDE -.->|"提示"| HARD
+```
+
+| 层 | `init` 产物 / 位置 | 职责 | 能否替代门禁 |
+| --- | --- | --- | --- |
+| 常驻规则 | `AGENTS.md` 受管片段；`.trae/rules/fe-guard.md`；`.cursor/rules/fe-guard.mdc` | 用最少 token 告诉模型必须走哪些工具 | 不能；模型可以无视 |
+| 斜杠命令 | `.trae/commands/fe-guard-next.md`、`fe-guard-gate.md` | 手动触发下一步 / 门禁 | 不能；只是入口 |
+| Skill（可选） | 项目或全局 skill；fe-guard 目前不内置 | 按需讲解、诊断、批量操作 | 不能；只做引导 |
+| MCP tools | 7 个 `task_*` + `ui_lookup`，共 8 个 | 推进阶段、真跑检查、写证据 | 流程内硬判定 |
+| commit / CI | `check --staged --profile fast`、`check --full` | 流程外兜底 | 唯一不可绕过（除 `--no-verify`） |
+
+为什么判定不放在 Skill 里：
+
+- **Token**：常驻规则有成本，AGENTS.md 片段约 591 / 600 token；Skill 按需加载，但仍只是说明。
+- **可验证性**：阶段与条件覆盖由事件和证据推导；Skill 写得再好，也不能让 `task_gate` 通过。
+- **单一事实源**：生成物统一来自 `src/ide/source.js`；再写一份 Skill 规则，等于维护第二套流程。
+- **适合 Skill 的事**：长尾诊断（doctor、FAQ 排查、批量操作），而不是核心流程判定。
+
 ## 挂到 Trae
 
 1. 在项目里执行 `npx fe-guard init`（已写入 `.trae/mcp.json`）。
@@ -67,6 +104,27 @@ AI 会依次调用下面的工具（IDE 的工具面板里能看到每个请求�
 | 3 | `task_plan` | `{ stage: "implement", next: "task_gate" }` |
 | 4 | 改代码 | —— |
 | 5 | `task_gate` | 通过：`{ ok: true, stage: "deliver", completion: { achieved: 2, total: 2, remaining: [], deferred: [] } }` |
+
+整条链路：
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+sequenceDiagram
+  participant U as 你
+  participant AI as AI
+  participant M as fe-guard MCP
+  participant C as 检查器
+  participant S as task.json
+  U->>AI: 需求
+  AI->>M: task_start / task_criteria / task_plan
+  M->>S: 追加事件
+  AI->>AI: 改代码 + 写测试
+  AI->>M: task_gate
+  M->>C: ESLint / tsc / tests / visualDiff
+  C-->>M: 违规与证据
+  M->>S: gate.recorded
+  M-->>AI: ok / blockers / completion
+```
 
 能写成测试的条件可以挂 `testFile`（仓库内相对路径，如 `{ text: "formatDuration(1000) 返回 1s", type: "data", source: "需求#时长", testFile: "test/duration.test.mjs" }`）。门禁会真跑这个测试，**通过才覆盖该条件**；测试命令来自配置 `workflow.gate.testCommand`（默认 `node --test`），模型只能给路径、不能给命令。每条条件还必须写 `type` 与 `source`，其余字段见下文。
 
@@ -187,6 +245,8 @@ npx fe-guard task defer C3 --reason "后端接口还没联调" --yes
 - 不启动浏览器、不做像素对比、不安装依赖；Playwright / Chromatic / 自研脚本都由项目提供。
 - 没有视觉条件时不执行，并在证据里记录 `ran: false, reason: "no-visual-criteria"`。
 
+配图与取舍说明见[推广页](promotion.md)的「0.6：视觉证据只认项目自己的命令」。
+
 ## 返工对比：修好与改坏
 
 门禁证据保存违规指纹（规则 + 文件 + 行，上限 100）。每次门禁与上一轮对比并返回：
@@ -253,6 +313,16 @@ npx fe-guard task stats --json
 + plan.written       → implement
 + gate.recorded      → verify
 + task.delivered     → deliver
+```
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+flowchart LR
+  S["contract"] -->|"task_criteria"| P["plan"]
+  P -->|"task_plan"| I["implement"]
+  I -->|"task_gate"| V["verify"]
+  V -->|"证据齐全、条件覆盖"| D["deliver"]
+  V -->|"blockers"| I
 ```
 
 一次门禁就通过时，`implement` 会直接跳到 `deliver`，中间不出现「实现完成」这个要模型判断的状态——「实现完了没有」本来就只能由门禁回答。这也是为什么阶段是 5 个而不是更多。

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="260" viewBox="0 0 1200 260" role="img" aria-labelledby="metricsTitle metricsDesc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <title id="metricsTitle">fe-guard numbers from real repositories</title>
+  <desc id="metricsDesc">Fast profile 2.0 seconds, full profile 2.5 seconds, 0/1092 error-level false positives, 19 real circular dependencies with 0 sampled false positives.</desc>
+  <rect width="1200" height="260" fill="#F7F8FA"/>
+  <text x="48" y="48" font-size="28" font-weight="700" fill="#1F2329">Numbers from real repositories</text>
+  <text x="48" y="72" font-size="13" fill="#6B7280">3 real Vue repositories, 109k–180k lines; every run happened on a copy</text>
+
+  <rect x="48" y="96" width="264" height="110" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <rect x="48" y="96" width="5" height="110" rx="2.5" fill="#3B82F6"/>
+  <text x="72" y="142" font-size="32" font-weight="700" fill="#1D4ED8">2.0s</text>
+  <text x="72" y="166" font-size="12.5" font-weight="600" fill="#1F2329">fast profile</text>
+  <text x="72" y="186" font-size="11" fill="#6B7280">109k-line single repo</text>
+
+  <rect x="336" y="96" width="264" height="110" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <rect x="336" y="96" width="5" height="110" rx="2.5" fill="#3B82F6"/>
+  <text x="360" y="142" font-size="32" font-weight="700" fill="#1D4ED8">2.5s</text>
+  <text x="360" y="166" font-size="12.5" font-weight="600" fill="#1F2329">full profile</text>
+  <text x="360" y="186" font-size="11" fill="#6B7280">same repo; the 3s hook target holds</text>
+
+  <rect x="624" y="96" width="264" height="110" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <rect x="624" y="96" width="5" height="110" rx="2.5" fill="#10B981"/>
+  <text x="648" y="142" font-size="32" font-weight="700" fill="#065F46">0 / 1092</text>
+  <text x="648" y="166" font-size="12.5" font-weight="600" fill="#1F2329">error-level false positives</text>
+  <text x="648" y="186" font-size="11" fill="#6B7280">manually sampled</text>
+
+  <rect x="912" y="96" width="264" height="110" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <rect x="912" y="96" width="5" height="110" rx="2.5" fill="#7C5CFF"/>
+  <text x="936" y="142" font-size="32" font-weight="700" fill="#4C1D95">19 / 0</text>
+  <text x="936" y="166" font-size="12.5" font-weight="600" fill="#1F2329">real cycles / sampled errors</text>
+  <text x="936" y="186" font-size="11" fill="#6B7280">dependency-cruiser 18.8.0</text>
+
+  <text x="48" y="232" font-size="11.5" fill="#6B7280">956 / 11424 existing violations recorded once; full data and per-item judgments in real-world.md</text>
+  <text x="1152" y="232" font-size="11" fill="#9CA3AF" text-anchor="end">fe-guard 0.6</text>
+</svg>

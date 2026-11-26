@@ -11,6 +11,24 @@
 
 fe-guard orchestrates the ESLint, tsc and dependency-cruiser you already have, normalizes their output into one violation shape, and uses a **baseline ratchet** to freeze legacy debt — **only new violations can fail the gate**. On top of that, it turns the AI development workflow into **MCP tools**: the AI in Trae / Cursor must call tools to advance through "contract → acceptance criteria → plan → implement → verify → deliver". Stage decisions live in code, not in the model's self-reporting.
 
+## 60-second overview
+
+- **Turn your existing lint / tsc / dependency-cruiser into a gate that only blocks new violations.** Legacy debt is frozen in a baseline ledger; fixing it tightens the ledger automatically.
+- **Turn the AI's "done" into checkable gate evidence.** MCP tools advance contract → criteria → plan → implement → verify → deliver; the AI cannot mark a stage as passed.
+- **Never a false green.** A check that did not run is `not-executed` and can never enter the baseline; skipped is not passed.
+
+![fe-guard's two layers](./docs/assets/overview.en.svg)
+
+*The check layer answers "did anything get worse?"; the workflow layer answers "is it actually finished?".*
+
+| Problem | What fe-guard does |
+| --- | --- |
+| Full lint goes red, so the check gets disabled | freeze existing debt, block only new violations |
+| The AI claims completion with no proof | MCP workflow + gate evidence + completion |
+| Duplicate components, dependency sprawl, file rot | four built-in checks + on-demand component lookup |
+
+Not a good fit for one-line copy changes, teams that do not want a committed baseline ledger, or anyone expecting autofix / semantic architecture review. Prefer the full visual walkthrough? See [why fe-guard](docs/promotion.md).
+
 ## Why
 
 - **AI output outpaces human review**: rebuilt components, a second library for the same capability, bloated files, `any` everywhere, copy-paste — human review can't keep up.
@@ -62,12 +80,15 @@ Adopting into a legacy codebase? `npx fe-guard init --preset legacy --dry-run` p
 
 The AI gets 7 `task_*` tools + `ui_lookup` and must call them to advance through contract → criteria → plan → implement → verify → deliver. Stage decisions live in code, so it cannot self-report "passed". On macOS, GUI apps don't load the shell PATH — with nvm/fnm, use absolute paths for `command`/`args` ([FAQ](docs/faq.md)).
 
+No extra Skill is required: `init` already writes resident rules, slash commands and MCP configs. A Skill is an optional guidance layer; decisions stay in the MCP tools and exit codes ([details](docs/workflow.md)).
+
 Full walkthrough: [workflow](docs/workflow.md).
 
 ## Documentation
 
 | Topic | Link |
 | --- | --- |
+| Positioning, diagrams and the full story | [promotion](docs/promotion.md) |
 | Quick start / commands / doctor / intranet distribution | [getting-started](docs/getting-started.md) |
 | The seven checks and how they detect | [checks](docs/checks.md) |
 | Baseline ratchet / profiles / exit codes | [baseline](docs/baseline.md) |

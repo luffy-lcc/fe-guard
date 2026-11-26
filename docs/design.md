@@ -20,6 +20,7 @@ It doesn't chase "conventions are everything". It does one thing: make "no worse
 - **Zero runtime dependencies**: the only external dependencies are the tools being checked. When a tool breaks, fe-guard gives a clear message instead of a stack trace.
 - **One config controls everything**: `enabled`, per-check `enabled`, `level`, `autoTighten`, `workflow.enabled` are all plain fields — operable without understanding the internals.
 - **Workflow as tools, not prompts**: a model "voluntarily complying" is unverifiable. Stages, criteria fulfillment, and gate results are all recorded as events, with decisions in code — only then can they be tested and audited.
+- **Skills guide, tools decide**: always-resident rules cost tokens; a skill loaded on demand suits long-tail explanations. Neither can move a task into delivery — only events and evidence can. `init` therefore generates a minimal rule snippet, slash commands and MCP configs, not a skill.
 - **Events, not state**: `task.json` is append-only events; the current stage is derived by `reduce()`. With no "set stage" entry point, there's no attack surface for "marking a stage as passed".
 - **Generated artifacts share one source**: AGENTS.md, Trae rules, Cursor rules, commands, and hooks are all rendered from `src/ide/source.js`; change one place and nothing drifts.
 - **No premature abstraction**: no plugin interface, no event bus, no task queue. The seven runners are each written standalone; what's duplicated is a dozen lines of argument assembly, and what you get is code you understand the moment you open the file.
@@ -42,12 +43,30 @@ It doesn't chase "conventions are everything". It does one thing: make "no worse
 The workflow layer turns "done" into facts that can be checked:
 
 - Every criterion must state its source and type; assumptions are confirmed by a human and cannot be delivered unconfirmed.
-- Verification is `gate` / `test` / `manual`: tests really run, manual evidence must exist and be non-empty, and its sha256 is recorded.
-- Every gate writes a snapshot (mode, exit code, completion, violation fingerprints, preflight result); a failed gate requires a lesson.
+- Verification is `gate` / `test` / `manual`: tests really run, manual evidence must exist and be non-empty, and its `bytes` + `sha256` are recorded.
+- Manual evidence can declare `evidenceKind` (`screenshot` / `diff` / `log`): manual infers it from the extension, gate only accepts `diff`.
+- A visual criterion is covered only when `visualDiff.ok === true`; a missing command, timeout or non-zero exit never covers it, even in `warn` mode.
+- Every gate writes a snapshot (mode, exit code, completion, violation fingerprints, preflight and visual result); a failed gate requires a lesson.
 - `completion` splits covered / deferred / pending; deferred items and remaining criteria are always reported.
-- Environment preflight is whatever command the project configures; a failure means "this check was not executed".
+- Environment preflight is whatever command the project configures, single or `steps[]`; any failed step means "this check was not executed".
 
-Deliberately not done: visual / screenshot diff, browser / dev-server / login-state preflight, spec distribution and sub-agent orchestration, mobile / real-device checks. See the [roadmap](roadmap.md) for why and what would trigger each.
+Deliberately not done: built-in browser automation, a pixel-diff implementation, per-criterion mapping to multiple visual commands, browser / dev-server / login-state preflight, spec distribution and sub-agent orchestration, mobile / real-device checks. Visual comparison only runs the project's own command; see [workflow](workflow.md).
+
+## Code architecture
+
+The CLI and the MCP gate share one check core; workflow decisions and evidence stay independent of the checkers:
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+flowchart LR
+  CLI["fe-guard CLI"] --> CORE["check-core"]
+  MCP["MCP task_gate"] --> CORE
+  CORE --> RUNNERS["runners: ESLint / tsc / boundaries / deps / ui / metrics / diff-size"]
+  CORE --> BASE["baseline ratchet"]
+  CORE --> REPORT["JSON / SARIF / HTML"]
+  MCP --> STATE["workflow state: derived from events"]
+  STATE --> EV["evidence snapshots"]
+```
 
 ## Directory layout
 
@@ -86,6 +105,9 @@ fe-guard/
 │   ├── mcp/server.js            minimal MCP stdio server (zero deps, newline-delimited JSON-RPC)
 │   ├── ide/                     source.js (single source of truth for artifacts) / tokens.js / artifacts.js (managed files + 5 MCP client configs)
 │   └── runners/                 index.js + eslint / typescript / boundaries / deps / ui / metrics / diff-size
+├── docs/                        bilingual documentation (full guides beyond the README)
+│   ├── assets/                  hand-written SVG diagrams (one per language, no external resources)
+│   └── zh/                      Chinese mirror
 ├── test/                        unit tests + v5/v6/v6.1/v6.2/v6.3 end-to-end + init detection / presets / MCP clients / SARIF / HTML / ESLint classification / trend / task summary / React-TSX / workspace boundaries / workflow contract / gate evidence / confirm & defer / preflight / lessons / stats
 ├── examples/sample-app/         sample project with legacy violations (the real trio of tools)
 ├── examples/husky-pre-commit    pre-commit hook example (fast profile)

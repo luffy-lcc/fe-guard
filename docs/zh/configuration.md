@@ -143,7 +143,7 @@
 | `report.path` | 报告文件路径 |
 | `diff.base` | `--diff-only` 与大 diff 统计的比较基准，可改成 `origin/main` 之类 |
 | `workflow.preflight` | `{ command, timeoutMs }` 或 `{ steps, timeoutMs }` 环境预检。`command` 与 `steps` 二选一；为空（默认）= 关闭。多步按顺序执行、失败即停，错误指出具体步骤；失败会让 `task_start` 不创建任务、`task_gate` 报「本次检查未执行」——不产证据、条件不被覆盖 |
-| `workflow.visualDiff` | `{ command, timeoutMs }` 外部视觉对比命令。`command` 为空（默认）= 关闭；只执行项目自己的命令，不启动浏览器。门禁遇到 `evidenceKind: "diff"` 的条件时才执行，失败/缺失/超时都不会覆盖条件 |
+| `workflow.visualDiff` | `{ command, timeoutMs }` 外部视觉对比命令。`command` 为空（默认）= 关闭；只执行项目自己的命令，不启动浏览器。门禁遇到 `evidenceKind: "diff"` 的条件时才执行，失败/缺失/超时都不会覆盖条件（图示见[推广页](promotion.md)） |
 | `workflow.distill` | `enforce`（默认）/ `warn` / `off`。`enforce` 时最近一次失败门禁之后必须记录 `task_lesson` 才能交付；`warn` 允许交付但标记 `degraded`；`off` 关闭要求 |
 | `workflow.*` | 流程层开关，见[流程层开关](workflow.md#开关) |
 

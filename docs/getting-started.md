@@ -35,6 +35,8 @@ It generates these files:
 
 `init` is safe to re-run: files are only written when content changes, and AGENTS.md only replaces the snippet between the markers — it never appends duplicates.
 
+No Skill is generated or required: the snippet, rules, commands and MCP configs above are the whole integration. A Skill, if you add one, is optional guidance and cannot replace the tools ([skills vs MCP](workflow.md)).
+
 Before writing the config, `init` probes the project: if there is no `tsconfig.json` (root or any workspace package) it disables `typescript`; without an ESLint config it disables `eslint`; without a `.dependency-cruiser.{cjs,js,json}` it disables `boundaries` and picks the file that does exist. The disabled checks are printed and written as `enabled: false`, so a plain JavaScript project passes its first `check` instead of aborting. Flip a check back on once its prerequisite is in place — an existing config is never re-probed unless you pass `--force`.
 
 ### Presets and `--dry-run`

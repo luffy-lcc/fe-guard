@@ -47,6 +47,13 @@ them to make a change pass.
 Use the issue templates. Include `npx fe-guard --version`, Node version, OS, the config, and
 the relevant `.fe-guard/report.json` (run with `FE_GUARD_DEBUG=1` for MCP issues).
 
+## Documentation diagrams
+
+- Use SVG only, stored under `docs/assets/`, with one file per language (`*.zh.svg` / `*.en.svg`).
+- Keep the palette and fonts consistent; do not reference external images, fonts or scripts, and do not use `<foreignObject>`.
+- Numbers in diagrams must match the prose; when a capability changes, update both the diagram and the text, especially `visualDiff.ok`, `not-executed` and `0.6.0+`.
+- After editing, run `xmllint --noout docs/assets/*.svg` and the docs check to catch broken links or unbalanced fences.
+
 ## Releasing
 
 1. Bump the version in `package.json` and in both `version` fields of `package-lock.json`;

@@ -3,6 +3,7 @@
 > 把前端规范变成一条「能过 / 不能过」的命令，把 AI 写代码导致的仓库腐化变成可拦截的门禁。
 
 [![CI](https://github.com/luffy-lcc/fe-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/luffy-lcc/fe-guard/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/luffy-lcc/fe-guard?sort=semver)](https://github.com/luffy-lcc/fe-guard/releases)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 

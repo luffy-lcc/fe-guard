@@ -3,6 +3,7 @@
 > Turn frontend conventions into a single pass/fail command, and turn AI-driven repository rot into an enforceable gate.
 
 [![CI](https://github.com/luffy-lcc/fe-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/luffy-lcc/fe-guard/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/luffy-lcc/fe-guard?sort=semver)](https://github.com/luffy-lcc/fe-guard/releases)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 

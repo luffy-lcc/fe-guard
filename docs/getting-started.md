@@ -13,7 +13,7 @@ npx fe-guard --version
 
 When the intranet has no public npm, use a tarball or a private registry — see [Intranet distribution](#intranet-distribution-two-paths-pick-one).
 
-Before the package is published to npm, install from GitHub: `npm i -D github:luffy-lcc/fe-guard`.
+The package is not published to npm yet. The current release is v0.6.0; install it from GitHub: `npm i -D github:luffy-lcc/fe-guard#v0.6.0`.
 
 ## 2. Initialize
 

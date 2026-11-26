@@ -13,7 +13,7 @@ npx fe-guard --version
 
 内网没有公共 npm 时，用 tarball 或私有 registry，见[内网分发](#内网分发两条路任选一条)。
 
-包尚未发布到 npm 时，可从 GitHub 安装：`npm i -D github:luffy-lcc/fe-guard`。
+包尚未发布到 npm。当前发布版为 v0.6.0，可从 GitHub 安装：`npm i -D github:luffy-lcc/fe-guard#v0.6.0`。
 
 ## 2. 初始化
 

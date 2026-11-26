@@ -143,7 +143,7 @@ Configuration is JSON, not YAML: zero dependencies (no hand-written YAML-subset 
 | `report.path` | Report file path |
 | `diff.base` | Comparison base for `--diff-only` and large-diff counting; can be changed to e.g. `origin/main` |
 | `workflow.preflight` | `{ command, timeoutMs }` or `{ steps, timeoutMs }` environment preflight. `command` and `steps` are mutually exclusive; empty (default) = off. Steps run in order and stop at the first failure, reported by name; a failure makes `task_start` create no task and makes `task_gate` report "this check was not executed" — no evidence, criteria not covered |
-| `workflow.visualDiff` | `{ command, timeoutMs }` external visual comparison command. Empty `command` (default) = off; only runs the project's own command, never a browser. The gate runs it only when a criterion declares `evidenceKind: "diff"`; failure, missing command and timeout never cover the criterion |
+| `workflow.visualDiff` | `{ command, timeoutMs }` external visual comparison command. Empty `command` (default) = off; only runs the project's own command, never a browser. The gate runs it only when a criterion declares `evidenceKind: "diff"`; failure, missing command and timeout never cover the criterion (diagram: [promotion](promotion.md)) |
 | `workflow.distill` | `enforce` (default) / `warn` / `off`. With `enforce`, a task cannot be delivered until a `task_lesson` is recorded after the last failed gate; `warn` allows delivery but marks it `degraded`; `off` disables the requirement |
 | `workflow.*` | Workflow-layer switches; see [Workflow switches](workflow.md#switches) |
 

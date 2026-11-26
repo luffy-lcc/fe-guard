@@ -4,6 +4,25 @@
 
 fe-guard 只做一件事：让「不准更差」自动执行。这一页记录已经交付的能力、正在准备的内容，以及明确不做的方向。
 
+> 当前发布版：0.6.0（2026-11-26）
+
+## 版本演进
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+flowchart LR
+  V1["0.1 · 检查层"] --> V2["0.2 · init"] --> V3["0.3 · 报告"] --> V4["0.4 · 合同 / MCP"] --> V5["0.5 · 包级账本"] --> V6["0.6 · 视觉证据"]
+  V6 -.-> NEXT["后续候选：Skill 分发 / 视觉细化 / 跨仓库看板"]
+  classDef done fill:#ECFDF5,stroke:#10B981,color:#065F46;
+  classDef current fill:#F5F3FF,stroke:#7C5CFF,color:#4C1D95,stroke-width:2px;
+  classDef next fill:#F9FAFB,stroke:#D1D5DB,color:#6B7280,stroke-dasharray:4 4;
+  class V1,V2,V3,V4,V5 done;
+  class V6 current;
+  class NEXT next;
+```
+
+绿色为已完成，紫色为当前发布版，灰色虚线为后续候选。
+
 ## 已完成
 
 - **0.1.x** — 检查层（七项检查）、baseline 棘轮、MCP 流程、fast / full 档位、`doctor`、monorepo 与 Vue 支持、`not-executed`。
@@ -45,6 +64,7 @@ fe-guard 只做一件事：让「不准更差」自动执行。这一页记录�
 - `evidenceKind` 已记录并在 `task status` / `task status --json` 中可读，且不新增运行时依赖。
 - `visualDiff.command` 不启动浏览器、不安装依赖；命令缺失按「未执行」处理，绝不当作通过。
 - 测试：`npm test` 191 全过；`verify-v4.mjs` 80 项断言（v1 37 / v2 135 / v3 83 / v4 80）。
+- 文档与配图同步：README、推广页、路线图与 `docs/assets` 双语 SVG 已更新。
 
 不包含：内置浏览器自动化、像素对比实现、移动端真机、按条件映射多个视觉命令。
 

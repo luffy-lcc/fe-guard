@@ -39,6 +39,13 @@
 
 使用 issue 模板。附上 `npx fe-guard --version`、Node 版本、OS、配置，以及相关的 `.fe-guard/report.json`（MCP 问题加 `FE_GUARD_DEBUG=1` 运行）。
 
+## 文档配图
+
+- 配图只用 SVG，放在 `docs/assets/`，中英各一份（`*.zh.svg` / `*.en.svg`）。
+- 统一配色与字体；不要引用外部图片、字体或脚本，也不要使用 `<foreignObject>`。
+- 图内数字与正文口径一致；改能力时同时改图和文字，尤其是 `visualDiff.ok`、`not-executed`、`0.6.0+`。
+- 修改后跑 `xmllint --noout docs/assets/*.svg` 和文档检查，确认没有断链与围栏错误。
+
 ## 发版
 
 1. 更新 `package.json` 与 `package-lock.json` 中两处 `version`；在 `CHANGELOG.md` 加条目。

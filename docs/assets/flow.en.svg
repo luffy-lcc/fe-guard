@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="flowTitle flowDesc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <title id="flowTitle">A complete fe-guard task, end to end</title>
+  <desc id="flowDesc">Six cards show contract, criteria, plan, implement, gate and deliver. Each stage has a Gate note; blockers send the task back to implement, and delivery requires evidence.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="700" fill="#F7F8FA"/>
+  <text x="48" y="54" font-size="30" font-weight="700" fill="#1F2329">One task, end to end</text>
+  <text x="48" y="82" font-size="14" fill="#6B7280">Contract → criteria → plan → implement → gate → deliver; every stage has a Gate</text>
+
+  <!-- Row 1 -->
+  <g>
+    <rect x="48" y="116" width="340" height="190" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <circle cx="76" cy="146" r="15" fill="#EFF6FF" stroke="#3B82F6"/>
+    <text x="76" y="151" font-size="14" font-weight="700" fill="#1D4ED8" text-anchor="middle">1</text>
+    <text x="102" y="152" font-size="17" font-weight="700" fill="#1F2329">Contract</text>
+    <text x="68" y="186" font-size="13" font-weight="600" fill="#1D4ED8">task_start</text>
+    <text x="68" y="210" font-size="12" fill="#4B5563">Goal, background, and what is out of scope</text>
+    <text x="68" y="232" font-size="12" fill="#4B5563">Align scope before writing code</text>
+    <rect x="64" y="256" width="308" height="36" rx="8" fill="#F9FAFB"/>
+    <text x="76" y="278" font-size="11" fill="#6B7280">Gate: no task, no plan</text>
+  </g>
+
+  <g>
+    <rect x="430" y="116" width="340" height="190" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <circle cx="458" cy="146" r="15" fill="#EFF6FF" stroke="#3B82F6"/>
+    <text x="458" y="151" font-size="14" font-weight="700" fill="#1D4ED8" text-anchor="middle">2</text>
+    <text x="484" y="152" font-size="17" font-weight="700" fill="#1F2329">Criteria</text>
+    <text x="450" y="186" font-size="13" font-weight="600" fill="#1D4ED8">task_criteria</text>
+    <text x="450" y="210" font-size="12" fill="#4B5563">Every criterion needs type + source</text>
+    <text x="450" y="232" font-size="12" fill="#4B5563">Assumptions are marked and confirmed by a human</text>
+    <rect x="446" y="256" width="308" height="36" rx="8" fill="#FFF7ED"/>
+    <text x="458" y="278" font-size="11" fill="#9A3412">Gate: incomplete criteria rejected</text>
+  </g>
+
+  <g>
+    <rect x="812" y="116" width="340" height="190" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <circle cx="840" cy="146" r="15" fill="#EFF6FF" stroke="#3B82F6"/>
+    <text x="840" y="151" font-size="14" font-weight="700" fill="#1D4ED8" text-anchor="middle">3</text>
+    <text x="866" y="152" font-size="17" font-weight="700" fill="#1F2329">Plan</text>
+    <text x="832" y="186" font-size="13" font-weight="600" fill="#1D4ED8">task_plan</text>
+    <text x="832" y="210" font-size="12" fill="#4B5563">1–15 implementation steps</text>
+    <text x="832" y="232" font-size="12" fill="#4B5563">The contract locks once the plan is written</text>
+    <rect x="828" y="256" width="308" height="36" rx="8" fill="#F9FAFB"/>
+    <text x="840" y="278" font-size="11" fill="#6B7280">Gate: no plan, no gate</text>
+  </g>
+
+  <!-- Row 1 arrows -->
+  <path d="M388 211 L424 211" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M770 211 L806 211" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M982 306 L982 326 L218 326 L218 340" stroke="#6B7280" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Row 2 -->
+  <g>
+    <rect x="48" y="344" width="340" height="190" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <circle cx="76" cy="374" r="15" fill="#F5F3FF" stroke="#7C5CFF"/>
+    <text x="76" y="379" font-size="14" font-weight="700" fill="#4C1D95" text-anchor="middle">4</text>
+    <text x="102" y="380" font-size="17" font-weight="700" fill="#1F2329">Implement</text>
+    <text x="68" y="414" font-size="13" font-weight="600" fill="#4C1D95">AI edits code, writes tests</text>
+    <text x="68" y="438" font-size="12" fill="#4B5563">Humans decide API, deps and design trade-offs</text>
+    <text x="68" y="460" font-size="12" fill="#4B5563">Call task_gate; no self-reporting</text>
+    <rect x="64" y="484" width="308" height="36" rx="8" fill="#F9FAFB"/>
+    <text x="76" y="506" font-size="11" fill="#6B7280">No automated Gate here; the gate is next</text>
+  </g>
+
+  <g>
+    <rect x="430" y="344" width="340" height="190" rx="16" fill="#FFFFFF" stroke="#7C5CFF" stroke-width="1.5"/>
+    <circle cx="458" cy="374" r="15" fill="#F5F3FF" stroke="#7C5CFF"/>
+    <text x="458" y="379" font-size="14" font-weight="700" fill="#4C1D95" text-anchor="middle">5</text>
+    <text x="484" y="380" font-size="17" font-weight="700" fill="#1F2329">Gate</text>
+    <text x="450" y="414" font-size="13" font-weight="600" fill="#4C1D95">task_gate</text>
+    <text x="450" y="438" font-size="12" fill="#4B5563">Preflight → checks → tests → manual/visual evidence</text>
+    <text x="450" y="460" font-size="12" fill="#4B5563">Rework diff: fixed / introduced</text>
+    <rect x="446" y="484" width="308" height="36" rx="8" fill="#FFF7ED"/>
+    <text x="458" y="506" font-size="11" fill="#9A3412">Gate: blockers go back to implement</text>
+  </g>
+
+  <g>
+    <rect x="812" y="344" width="340" height="190" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <circle cx="840" cy="374" r="15" fill="#ECFDF5" stroke="#10B981"/>
+    <text x="840" y="379" font-size="14" font-weight="700" fill="#065F46" text-anchor="middle">6</text>
+    <text x="866" y="380" font-size="17" font-weight="700" fill="#1F2329">Deliver</text>
+    <text x="832" y="414" font-size="13" font-weight="600" fill="#065F46">deliver</text>
+    <text x="832" y="438" font-size="12" fill="#4B5563">completion: N done / M deferred</text>
+    <text x="832" y="460" font-size="12" fill="#4B5563">Evidence snapshot on disk, auditable later</text>
+    <rect x="828" y="484" width="308" height="36" rx="8" fill="#ECFDF5"/>
+    <text x="840" y="506" font-size="11" fill="#065F46">Gate: task_lesson after a failed gate</text>
+  </g>
+
+  <!-- Row 2 arrows -->
+  <path d="M388 439 L424 439" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M770 439 L806 439" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M430 429 L392 429" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrowOrange)"/>
+
+  <!-- Bottom bar -->
+  <rect x="48" y="566" width="1104" height="46" rx="12" fill="#7C5CFF"/>
+  <text x="600" y="595" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">Evidence is the only passport: no evidence, not done</text>
+  <text x="48" y="646" font-size="12" fill="#6B7280">A check that did not run is not a pass; skipped ≠ passed</text>
+  <text x="1152" y="646" font-size="12" fill="#9CA3AF" text-anchor="end">fe-guard 0.6</text>
+</svg>

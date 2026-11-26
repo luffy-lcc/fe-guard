@@ -12,6 +12,43 @@ So the workflow layer does this:
 - Hard rules live in **code**. There is no "mark the stage as passed" tool; nothing the model outputs can move a task into the delivered state.
 - The generated rule file keeps only the shortest set of non-standard conventions (the AGENTS.md snippet is ~591 tokens, capped at 600).
 
+![One task from contract to delivery](./assets/flow.en.svg)
+
+*Figure: contract → criteria → plan → implement → gate → deliver; every stage has a Gate.*
+
+## Skills, rules and MCP: who does what
+
+fe-guard does not require any Skill. `init` generates resident rules, slash commands and MCP configs; a Skill is an optional manual, not a decision layer.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+flowchart LR
+  subgraph GUIDE["Guidance: helps the model understand"]
+    R["Resident rules: AGENTS.md / IDE rules"] --> C["Slash commands: /fe-guard-next, /fe-guard-gate"]
+    C --> S["Skill (optional): on-demand explanation"]
+  end
+  subgraph HARD["Decision layer: can it be delivered?"]
+    M["MCP tools: 7 task_* + ui_lookup"] --> E["Gate evidence / completion"]
+    CI["commit / CI: check exit code"] --> E
+  end
+  GUIDE -.->|"hints"| HARD
+```
+
+| Layer | `init` artifact / location | Job | Can it replace the gate? |
+| --- | --- | --- | --- |
+| Resident rules | the managed `AGENTS.md` snippet; `.trae/rules/fe-guard.md`; `.cursor/rules/fe-guard.mdc` | tell the model which tools to use, with minimal tokens | No; the model can ignore it |
+| Slash commands | `.trae/commands/fe-guard-next.md`, `fe-guard-gate.md` | manually trigger the next step / gate | No; just an entry point |
+| Skill (optional) | project or global skill; not bundled today | on-demand explanations, diagnostics, batch operations | No; guidance only |
+| MCP tools | 7 `task_*` tools + `ui_lookup`, 8 total | advance stages, run checks, write evidence | Hard decisions inside the workflow |
+| commit / CI | `check --staged --profile fast`, `check --full` | the outer backstop | The only unbypassable path (except `--no-verify`) |
+
+Why decisions are not put in a Skill:
+
+- **Tokens**: resident rules cost tokens; the AGENTS.md snippet is ~591 / 600. A skill loads on demand but is still guidance.
+- **Verifiability**: stages and criterion coverage are derived from events and evidence; no skill text can make `task_gate` pass.
+- **Single source of truth**: generated artifacts come from `src/ide/source.js`; a second rule set in a skill would be a second workflow to maintain.
+- **Good uses of a skill**: long-tail diagnostics (doctor, FAQ walkthroughs, batch operations), not the core gate.
+
 ## Connecting Trae
 
 1. Run `npx fe-guard init` in the project (it writes `.trae/mcp.json`).
@@ -68,6 +105,27 @@ The AI calls the following tools in order (every request and return value is vis
 | 4 | Edit code | — |
 | 5 | `task_gate` | Passed: `{ ok: true, stage: "deliver", completion: { achieved: 2, total: 2, remaining: [], deferred: [] } }` |
 
+The full chain:
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+sequenceDiagram
+  participant U as You
+  participant AI as AI
+  participant M as fe-guard MCP
+  participant C as Checkers
+  participant S as task.json
+  U->>AI: Requirement
+  AI->>M: task_start / task_criteria / task_plan
+  M->>S: Append events
+  AI->>AI: Edit code + write tests
+  AI->>M: task_gate
+  M->>C: ESLint / tsc / tests / visualDiff
+  C-->>M: Violations and evidence
+  M->>S: gate.recorded
+  M-->>AI: ok / blockers / completion
+```
+
 Criteria that can be written as tests can carry a `testFile` (repo-relative path, e.g. `{ text: "formatDuration(1000) returns 1s", type: "data", source: "requirement#duration", testFile: "test/duration.test.mjs" }`). The gate really runs that test, and **only a pass covers the criterion**; the test command comes from the config `workflow.gate.testCommand` (default `node --test`) — the model can only supply a path, never a command. Every criterion also needs `type` and `source`; the next sections explain the rest of the contract.
 
 When the gate does not pass, step 5 returns:
@@ -78,11 +136,11 @@ When the gate does not pass, step 5 returns:
   "stage": "verify",
   "completion": { "achieved": 0, "total": 2, "remaining": [{ "id": "C1", "text": "..." }], "deferred": [] },
   "blockers": [
-    "门禁未通过：新增 1 条违规（error 1）",
+    "Gate not passed: 1 new violation (error 1)",
     "eslint/@typescript-eslint/no-explicit-any @ src/utils/math.ts:12",
-    "验收条件未覆盖：C1"
+    "Criterion not covered: C1"
   ],
-  "next": "修复问题后再次调用 task_gate"
+  "next": "Fix the issues and call task_gate again"
 }
 ```
 
@@ -187,6 +245,8 @@ The command is split on whitespace (no shell interpretation), like `workflow.gat
 - No browser is launched, no pixel diff is implemented, and no dependency is installed; Playwright / Chromatic / custom scripts all come from the project.
 - With no visual criteria it does not run and records `ran: false, reason: "no-visual-criteria"`.
 
+See [promotion](promotion.md) for the diagram and rationale.
+
 ## Rework diff: fixed vs introduced
 
 Gate evidence stores violation fingerprints (rule + file + line, capped at 100). Each gate compares with the previous run and returns:
@@ -253,6 +313,16 @@ task.started         → contract
 + plan.written       → implement
 + gate.recorded      → verify
 + task.delivered     → deliver
+```
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+flowchart LR
+  S["contract"] -->|"task_criteria"| P["plan"]
+  P -->|"task_plan"| I["implement"]
+  I -->|"task_gate"| V["verify"]
+  V -->|"Evidence complete, criteria covered"| D["deliver"]
+  V -->|"blockers"| I
 ```
 
 When the gate passes on the first try, `implement` jumps straight to `deliver`; there is no intermediate "implementation complete" state for the model to judge — "is the implementation done" can only be answered by the gate anyway. That is also why there are 5 stages, not more.

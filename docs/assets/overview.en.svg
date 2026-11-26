@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="ovTitle ovDesc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <title id="ovTitle">fe-guard's two layers: checks and workflow</title>
+  <desc id="ovDesc">The left check layer orchestrates ESLint, TypeScript, dependency-cruiser and four built-in checks, then uses a baseline ratchet to block only new violations. The right workflow layer advances a task through MCP tools and records gate evidence.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7C5CFF"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="620" fill="#F7F8FA"/>
+
+  <text x="48" y="54" font-size="30" font-weight="700" fill="#1F2329">Two layers, one goal</text>
+  <text x="48" y="82" font-size="14" fill="#6B7280">The check layer holds the floor; the workflow layer proves completion.</text>
+
+  <!-- Check layer -->
+  <rect x="48" y="112" width="540" height="430" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <rect x="72" y="136" width="126" height="32" rx="16" fill="#EFF6FF"/>
+  <text x="135" y="157" font-size="15" font-weight="700" fill="#1D4ED8" text-anchor="middle">Check layer</text>
+  <text x="214" y="157" font-size="13" fill="#6B7280">did anything get worse?</text>
+
+  <rect x="72" y="188" width="492" height="64" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="88" y="212" font-size="13" font-weight="600" fill="#1F2329">The project's ESLint / tsc / dependency-cruiser</text>
+  <text x="88" y="234" font-size="12" fill="#6B7280">Runs only when configured; missing tools report not-executed</text>
+
+  <rect x="72" y="264" width="492" height="64" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="88" y="288" font-size="13" font-weight="600" fill="#1F2329">Dependency guard / component inventory / rot metrics / large diff</text>
+  <text x="88" y="310" font-size="12" fill="#6B7280">Four built-in checks; zero runtime dependencies</text>
+
+  <path d="M318 328 L318 344" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="228" y="344" width="180" height="32" rx="10" fill="#EFF6FF" stroke="#BFDBFE"/>
+  <text x="318" y="365" font-size="13" font-weight="600" fill="#1D4ED8" text-anchor="middle">Normalized violations</text>
+
+  <path d="M318 376 L318 392" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="192" y="392" width="252" height="44" rx="12" fill="#F5F3FF" stroke="#7C5CFF"/>
+  <text x="318" y="419" font-size="14" font-weight="700" fill="#4C1D95" text-anchor="middle">baseline ratchet</text>
+
+  <path d="M240 436 L192 452" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M396 436 L444 452" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="72" y="452" width="240" height="56" rx="12" fill="#FFF7ED" stroke="#F59E0B"/>
+  <text x="192" y="475" font-size="13" font-weight="700" fill="#9A3412" text-anchor="middle">New violations</text>
+  <text x="192" y="496" font-size="12" fill="#9A3412" text-anchor="middle">Exit 1: blocked</text>
+  <rect x="324" y="452" width="240" height="56" rx="12" fill="#ECFDF5" stroke="#10B981"/>
+  <text x="444" y="475" font-size="13" font-weight="700" fill="#065F46" text-anchor="middle">Existing debt and fixes</text>
+  <text x="444" y="496" font-size="12" fill="#065F46" text-anchor="middle">Exit 0: pass</text>
+
+  <!-- Workflow layer -->
+  <rect x="612" y="112" width="540" height="430" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <rect x="636" y="136" width="140" height="32" rx="16" fill="#F5F3FF"/>
+  <text x="706" y="157" font-size="15" font-weight="700" fill="#4C1D95" text-anchor="middle">Workflow layer</text>
+  <text x="792" y="157" font-size="13" fill="#6B7280">is it actually finished?</text>
+
+  <rect x="648" y="184" width="468" height="42" rx="10" fill="#F5F3FF" stroke="#DDD6FE"/>
+  <text x="664" y="210" font-size="13" fill="#1F2329"><tspan font-weight="700">task_start</tspan><tspan fill="#6B7280"> — goal and out of scope</tspan></text>
+  <path d="M882 226 L882 234" stroke="#7C5CFF" stroke-width="1.5" marker-end="url(#arrowPurple)"/>
+
+  <rect x="648" y="234" width="468" height="42" rx="10" fill="#F5F3FF" stroke="#DDD6FE"/>
+  <text x="664" y="260" font-size="13" fill="#1F2329"><tspan font-weight="700">task_criteria</tspan><tspan fill="#6B7280"> — type + source per criterion</tspan></text>
+  <path d="M882 276 L882 284" stroke="#7C5CFF" stroke-width="1.5" marker-end="url(#arrowPurple)"/>
+
+  <rect x="648" y="284" width="468" height="42" rx="10" fill="#F5F3FF" stroke="#DDD6FE"/>
+  <text x="664" y="310" font-size="13" fill="#1F2329"><tspan font-weight="700">task_plan</tspan><tspan fill="#6B7280"> — 1–15 steps, then the contract locks</tspan></text>
+  <path d="M882 326 L882 334" stroke="#7C5CFF" stroke-width="1.5" marker-end="url(#arrowPurple)"/>
+
+  <rect x="648" y="334" width="468" height="42" rx="10" fill="#F5F3FF" stroke="#7C5CFF" stroke-width="1.5"/>
+  <text x="664" y="360" font-size="13" fill="#1F2329"><tspan font-weight="700">task_gate</tspan><tspan fill="#6B7280"> — really runs checks, tests, visual command</tspan></text>
+  <path d="M882 376 L882 384" stroke="#7C5CFF" stroke-width="1.5" marker-end="url(#arrowPurple)"/>
+
+  <rect x="648" y="384" width="468" height="42" rx="10" fill="#ECFDF5" stroke="#10B981"/>
+  <text x="664" y="410" font-size="13" fill="#1F2329"><tspan font-weight="700">deliver</tspan><tspan fill="#065F46"> — completion + evidence</tspan></text>
+
+  <path d="M648 355 L592 355" stroke="#7C5CFF" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrowPurple)"/>
+
+  <text x="648" y="456" font-size="12" fill="#6B7280">Stages are derived from events; the model cannot mark a stage as passed.</text>
+  <text x="648" y="480" font-size="12" fill="#9A3412">After a failed gate, task_lesson is required before delivery.</text>
+
+  <!-- Footer badges -->
+  <rect x="48" y="568" width="150" height="32" rx="16" fill="#ECFDF5" stroke="#10B981"/>
+  <text x="123" y="589" font-size="13" font-weight="600" fill="#065F46" text-anchor="middle">Only new violations</text>
+  <rect x="210" y="568" width="156" height="32" rx="16" fill="#F5F3FF" stroke="#7C5CFF"/>
+  <text x="288" y="589" font-size="13" font-weight="600" fill="#4C1D95" text-anchor="middle">Never a false green</text>
+  <rect x="378" y="568" width="156" height="32" rx="16" fill="#EFF6FF" stroke="#3B82F6"/>
+  <text x="456" y="589" font-size="13" font-weight="600" fill="#1D4ED8" text-anchor="middle">Auditable evidence</text>
+  <text x="1152" y="589" font-size="12" fill="#9CA3AF" text-anchor="end">fe-guard 0.6</text>
+</svg>

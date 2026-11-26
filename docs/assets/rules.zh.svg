@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="rulesTitle rulesDesc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <title id="rulesTitle">fe-guard 的四条硬规矩</title>
+  <desc id="rulesDesc">四条规矩：先冻结存量再只拦新增；没执行不等于通过；用证据而不是声称；失败门禁必须复盘。每条都说明为什么。</desc>
+  <rect width="1200" height="420" fill="#F7F8FA"/>
+  <text x="48" y="54" font-size="30" font-weight="700" fill="#1F2329">四条硬规矩</text>
+  <text x="48" y="82" font-size="14" fill="#6B7280">每条都不是建议，是代码里的判定</text>
+
+  <!-- Card 1 -->
+  <g>
+    <rect x="48" y="116" width="264" height="220" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="48" y="116" width="264" height="6" rx="3" fill="#3B82F6"/>
+    <circle cx="76" cy="148" r="14" fill="#EFF6FF" stroke="#3B82F6"/>
+    <text x="76" y="153" font-size="13" font-weight="700" fill="#1D4ED8" text-anchor="middle">1</text>
+    <text x="100" y="154" font-size="17" font-weight="700" fill="#1F2329">先冻结，再只拦新增</text>
+    <text x="68" y="188" font-size="12.5" fill="#4B5563">baseline 记录存量违规</text>
+    <text x="68" y="210" font-size="12.5" fill="#4B5563">check 只拦超出账本的部分</text>
+    <text x="68" y="232" font-size="12.5" fill="#4B5563">修掉旧问题自动收紧</text>
+    <rect x="64" y="258" width="232" height="58" rx="8" fill="#EFF6FF"/>
+    <text x="76" y="278" font-size="11" fill="#1D4ED8">为什么：</text>
+    <text x="76" y="296" font-size="11" fill="#1D4ED8">全量 lint 一开就红，</text>
+    <text x="76" y="311" font-size="11" fill="#1D4ED8">团队只会关掉检查</text>
+  </g>
+
+  <!-- Card 2 -->
+  <g>
+    <rect x="344" y="116" width="264" height="220" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="344" y="116" width="264" height="6" rx="3" fill="#F59E0B"/>
+    <circle cx="372" cy="148" r="14" fill="#FFF7ED" stroke="#F59E0B"/>
+    <text x="372" y="153" font-size="13" font-weight="700" fill="#9A3412" text-anchor="middle">2</text>
+    <text x="396" y="154" font-size="17" font-weight="700" fill="#1F2329">没执行 ≠ 通过</text>
+    <text x="364" y="188" font-size="12.5" fill="#4B5563">缺工具 / 超时 / 崩溃</text>
+    <text x="364" y="210" font-size="12.5" fill="#4B5563">报 not-executed，永不入账</text>
+    <text x="364" y="232" font-size="12.5" fill="#4B5563">skipped 也不等于 passed</text>
+    <rect x="360" y="258" width="232" height="58" rx="8" fill="#FFF7ED"/>
+    <text x="372" y="278" font-size="11" fill="#9A3412">为什么：</text>
+    <text x="372" y="296" font-size="11" fill="#9A3412">假绿灯比红灯更危险，</text>
+    <text x="372" y="311" font-size="11" fill="#9A3412">它会让团队以为已经安全</text>
+  </g>
+
+  <!-- Card 3 -->
+  <g>
+    <rect x="640" y="116" width="264" height="220" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="640" y="116" width="264" height="6" rx="3" fill="#7C5CFF"/>
+    <circle cx="668" cy="148" r="14" fill="#F5F3FF" stroke="#7C5CFF"/>
+    <text x="668" y="153" font-size="13" font-weight="700" fill="#4C1D95" text-anchor="middle">3</text>
+    <text x="692" y="154" font-size="17" font-weight="700" fill="#1F2329">证据而不是声称</text>
+    <text x="660" y="188" font-size="12.5" fill="#4B5563">每次门禁写快照</text>
+    <text x="660" y="210" font-size="12.5" fill="#4B5563">手工证据记 bytes + sha256</text>
+    <text x="660" y="232" font-size="12.5" fill="#4B5563">视觉条件要 visualDiff.ok</text>
+    <rect x="656" y="258" width="232" height="58" rx="8" fill="#F5F3FF"/>
+    <text x="668" y="278" font-size="11" fill="#4C1D95">为什么：</text>
+    <text x="668" y="296" font-size="11" fill="#4C1D95">模型说「完成了」不花成本，</text>
+    <text x="668" y="311" font-size="11" fill="#4C1D95">证据才需要真的跑一遍</text>
+  </g>
+
+  <!-- Card 4 -->
+  <g>
+    <rect x="936" y="116" width="264" height="220" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="936" y="116" width="264" height="6" rx="3" fill="#10B981"/>
+    <circle cx="964" cy="148" r="14" fill="#ECFDF5" stroke="#10B981"/>
+    <text x="964" y="153" font-size="13" font-weight="700" fill="#065F46" text-anchor="middle">4</text>
+    <text x="988" y="154" font-size="17" font-weight="700" fill="#1F2329">失败必须复盘</text>
+    <text x="956" y="188" font-size="12.5" fill="#4B5563">失败门禁后写 task_lesson</text>
+    <text x="956" y="210" font-size="12.5" fill="#4B5563">交付只报 N 完成 / M 待办</text>
+    <text x="956" y="232" font-size="12.5" fill="#4B5563">degraded 必须显式标注</text>
+    <rect x="952" y="258" width="232" height="58" rx="8" fill="#ECFDF5"/>
+    <text x="964" y="278" font-size="11" fill="#065F46">为什么：</text>
+    <text x="964" y="296" font-size="11" fill="#065F46">不复盘，就会在同一个坑里</text>
+    <text x="964" y="311" font-size="11" fill="#065F46">反复摔，还每次都说是新问题</text>
+  </g>
+
+  <rect x="48" y="356" width="1104" height="40" rx="10" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="600" y="381" font-size="14" font-weight="600" fill="#4B5563" text-anchor="middle">跳过 ≠ 通过 · 没执行 ≠ 没问题</text>
+  <text x="1152" y="411" font-size="11" fill="#9CA3AF" text-anchor="end">fe-guard 0.6</text>
+</svg>

@@ -19,12 +19,16 @@ Each capability has a clear "pain-point signal"; enable it when the signal appea
 | The basic six + commit hook | On at adoption (default) | Included by `init` |
 | boundaries | Layering gets complex / circular imports appear / multiple people need architecture constraints | You run into circular imports; module count rises in `doctor` |
 | Workflow layer (MCP task) | AI becomes the main author and often "claims done" but gets reworked | High delivery rework rate; you want real-run evidence via `testFile` |
+| Visual evidence (`visualDiff`) | Stable visual baselines exist and visual regression is eyeballed | Screenshots / diffs are checked manually; the gate needs evidence |
+| Skills / slash commands (optional) | The team wants on-demand entry points for common checks / next steps | The AI forgets the next step; a low-token playbook helps |
 | Real-time edit hooks | Commit blocking comes too late; the AI has already changed a large area | Hooks frequently block large numbers of violations |
 | Tighten thresholds / pay down legacy | Legacy concentrates in one rule and the team has spare capacity | Top rules dominate in `baseline --by-rule` |
 | A second gate in CI | Multi-person collaboration / worry about `--no-verify` bypasses | Bypass records appear |
 | Per-package thresholds via `overrides` | Old and new packages in a monorepo need different standards | Violation density varies widely across directories |
 
 Cadence: run `doctor` once a week and watch the baseline trend; enable whichever item's pain point surfaces; **add only one item at a time, observe its false-positive rate and timing, then decide on the next**. This avoids premature complexity without missing capabilities you should add.
+
+Suggested order: make the commit hook the hard gate first, then enable the MCP workflow, and only then consider a Skill / slash commands. A Skill explains things on demand and can run batch operations; it cannot make the gate pass or replace the `check` exit code.
 
 ## Common concerns, clarified
 

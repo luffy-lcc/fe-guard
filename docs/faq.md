@@ -66,7 +66,10 @@ They are human decisions: confirming an assumption or accepting a release todo c
 Put whatever must be true before verification is meaningful — for example `npm run check:env` verifying a local API, generated types or required environment variables. Use `steps[]` when you need named checks (dev server, proxy, login state) so a failure tells you which one broke. If it fails, `task_start` creates no task and `task_gate` reports "this check was not executed" (no evidence, criteria not covered). fe-guard never starts your dev server or logs in for you.
 
 **Does visual regression conflict with screenshots taken by Trae or another agent?**
-No. Agent screenshots are exploration and can be attached as `verify: manual` + `evidenceKind: "screenshot"`; a `verify: gate` + `diff` criterion still requires the project's own `workflow.visualDiff.command`. The command's exit code, output and hash are the auditable evidence; the agent's screenshot is a debugging aid, not a pass.
+No. Agent screenshots are exploration and can be attached as `verify: manual` + `evidenceKind: "screenshot"`; a `verify: gate` + `diff` criterion still requires the project's own `workflow.visualDiff.command`. The command's exit code, output and hash are the auditable evidence; the agent's screenshot is a debugging aid, not a pass. See [promotion](promotion.md) for the diagram.
+
+**Do I need to install a fe-guard Skill? How does it relate to MCP?**
+No. `init` already writes the managed `AGENTS.md` snippet, Trae / Cursor rules, two slash commands and five MCP client configs. MCP is the hard path; a Skill is optional on-demand guidance. No Skill is bundled today: decisions must live in the tools and exit codes, and a second rule set in a Skill would become a second source of truth. See [workflow](workflow.md).
 
 **Why can't I deliver after a failed gate? How do I turn it off?**
 `workflow.distill` defaults to `enforce`: after the last failed gate, a `task_lesson` (text + evidence + scope) is required. Set it to `warn` to allow delivery marked `degraded`, or `off` to disable the requirement. Don't write a fake lesson just to pass.

@@ -85,6 +85,7 @@
 - **hooks are example files only** and don't take effect automatically; event names must be aligned with your IDE version. Neither IDE has a git pre-commit event.
 - **Task state is single-repo, single-task**: only one task in progress at a time, auto-archived to `.fe-guard/tasks/` after delivery; no cross-repo aggregation, no concurrent task queue.
 - **The AGENTS.md snippet is a "non-standard convention" for the model**, capped at 600 tokens (~591 measured). It doesn't replace the decisions in the tools — even if the model ignores it entirely, the tools still reject illegal operations.
+- **No built-in skill or sub-agent orchestration.** A skill can guide but cannot replace MCP tools, gate evidence or exit codes; if one is added later, it will only wrap queries and explanations, never decisions.
 
 ## Explicitly not done (don't expect these)
 
@@ -95,6 +96,7 @@
 - Cross-repo dependency governance (org-level "single-library allowlist" rollout); performance budgets / bundle-size checks.
 - A general workspace-topology parser (no parsing of Rush / Nx / Turborepo custom project graphs).
 - Automatic downgrading of false positives; web-based visual baseline review.
+- Built-in browser and pixel diff: 0.6 only runs the project's own visual command, with no bundled browser or pixel comparison.
 - monorepo cross-package dependency-graph analysis (that's `boundaries`' job, and it still needs dependency-cruiser).
 
 If any of these are ever built, they should come after "checks + workflow" run stably and the team actually uses the baseline ledger.

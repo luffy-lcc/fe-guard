@@ -35,6 +35,8 @@ npx fe-guard init
 
 `init` 可以重复执行：内容没变就不写文件，AGENTS.md 只替换 marker 之间的片段，不会重复追加。
 
+不会生成也不需要安装 Skill：上面的片段、规则、命令和 MCP 配置就是全部接入。Skill 只是可选的引导，不能替代工具判定（见 [workflow](workflow.md)）。
+
 写配置之前 `init` 会先探测项目：没有 `tsconfig.json`（根目录与 workspace 子包都算）就关闭 `typescript`；没有 ESLint 配置就关闭 `eslint`；没有 `.dependency-cruiser.{cjs,js,json}` 就关闭 `boundaries`，并按实际存在的那个文件写 `args`。被关闭的检查会打印出来并写成 `enabled: false`，因此纯 JS 项目第一次 `check` 就能正常通过，而不是直接中断。前置条件补齐后把开关改回 true 即可；已存在的配置不会被重新探测，除非显式加 `--force`。
 
 ### 预设与 `--dry-run`

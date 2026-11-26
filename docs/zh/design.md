@@ -20,6 +20,7 @@ fe-guard 的想法很朴素：
 - **零运行时依赖**：唯一的外部依赖是被检查的工具本身。工具坏了，fe-guard 给出明确提示而不是抛栈。
 - **一个配置关全局**：`enabled`、单项 `enabled`、`level`、`autoTighten`、`workflow.enabled` 都是普通字段，不需要理解内部机制也能操作。
 - **流程做成工具，不做提示词**：模型“自觉遵守”不可验证；把阶段、条件达成、门禁结果都落成事件，判定写在代码里，才能被测试和审计。
+- **Skill 只做引导，判定必须在工具里**：常驻规则有 token 成本，Skill 按需加载适合长尾说明；但两者都不能让任务进入交付态，只有事件与证据可以。因此 `init` 不生成 Skill，只生成最小规则、斜杠命令和 MCP 配置。
 - **事件而不是状态**：`task.json` 只追加事件，当前阶段由 `reduce()` 推导。没有“设置阶段”的入口，就没有“把阶段标成通过”的攻击面。
 - **两套生成物同源**：AGENTS.md、Trae 规则、Cursor 规则、命令、hooks 全部从 `src/ide/source.js` 渲染，改一处不会漂移。
 - **不做提前抽象**：没有插件接口、没有事件总线、没有任务队列。七个 runner 各写各的，重复的是十几行参数拼装，换来的是打开文件就能看懂。
@@ -42,12 +43,30 @@ fe-guard 的想法很朴素：
 流程层把「做完了」拆成可核对的事实：
 
 - 验收条件必须写出处与类型；推断项由人确认，未确认不能交付。
-- 验收方式分 `gate` / `test` / `manual`：测试真跑，手工证据校验存在且非空并记录 sha256。
-- 每次门禁写快照（模式、退出码、完成度、违规指纹、预检结果）；失败门禁后必须复盘。
+- 验收方式分 `gate` / `test` / `manual`：测试真跑，手工证据校验存在且非空并记录 `bytes` + `sha256`。
+- 手工证据可标 `evidenceKind`（`screenshot` / `diff` / `log`）：manual 按扩展名推断，gate 只接受 `diff`。
+- 视觉条件只有 `visualDiff.ok === true` 才算覆盖；命令缺失、超时、非零退出都不算，`warn` 模式也不放宽。
+- 每次门禁写快照（模式、退出码、完成度、违规指纹、预检与视觉对比结果）；失败门禁后必须复盘。
 - `completion` 分 covered / deferred / pending；待办与剩余条件都会出现在报告里。
-- 环境预检由项目自己的命令决定；失败即「本次检查未执行」。
+- 环境预检由项目自己的命令决定，支持单命令或 `steps[]` 多步；任一步失败即「本次检查未执行」。
 
-明确不做：视觉比稿 / 截图 diff、浏览器 / dev server / 登录态预检、规范分发与子代理编排、移动端真机。原因与触发条件见[路线图](roadmap.md)。
+明确不做：内置浏览器自动化、像素对比实现、条件级多视觉命令映射、浏览器 / dev-server / 登录态预检、规范分发与子代理编排、移动端真机。视觉对比只执行项目自己的命令，见 [workflow](workflow.md)。
+
+## 代码架构
+
+CLI 与 MCP 门禁共用同一个检查内核；流程层的判定与证据独立于检查器：
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+flowchart LR
+  CLI["fe-guard CLI"] --> CORE["check-core"]
+  MCP["MCP task_gate"] --> CORE
+  CORE --> RUNNERS["runners：ESLint / tsc / boundaries / deps / ui / metrics / diff-size"]
+  CORE --> BASE["baseline 棘轮"]
+  CORE --> REPORT["JSON / SARIF / HTML"]
+  MCP --> STATE["workflow state：事件推导"]
+  STATE --> EV["evidence 快照"]
+```
 
 ## 目录结构
 
@@ -86,6 +105,9 @@ fe-guard/
 │   ├── mcp/server.js            极简 MCP stdio server（零依赖，换行分隔 JSON-RPC）
 │   ├── ide/                     source.js（产物唯一事实源）/ tokens.js / artifacts.js（受管文件 + 5 个 MCP 客户端配置）
 │   └── runners/                 index.js + eslint / typescript / boundaries / deps / ui / metrics / diff-size
+├── docs/                        中英双语文档（README 之外的完整说明）
+│   ├── assets/                  手写 SVG 配图（中英各一份，无外部资源）
+│   └── zh/                      中文镜像
 ├── test/                        单测 + v5/v6/v6.1/v6.2/v6.3 端到端 + init 探测 / 预设 / MCP 客户端 / SARIF / HTML / ESLint 消息分类 / 趋势 / 任务摘要 / React-TSX / 跨包边界 / 工作流合同 / 门禁证据 / confirm 与 defer / 预检 / 复盘 / 统计
 ├── examples/sample-app/         带存量违规的样例工程（真实三件套）
 ├── examples/husky-pre-commit    提交前钩子示例（fast 档）

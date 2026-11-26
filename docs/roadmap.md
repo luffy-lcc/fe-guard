@@ -4,6 +4,25 @@
 
 fe-guard has one job: make "no worse than before" automatic. This page records what has shipped, what is being prepared, and what is deliberately out of scope.
 
+> Current release: 0.6.0 (2026-11-26)
+
+## Version timeline
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#F5F3FF','primaryTextColor':'#1F2329','primaryBorderColor':'#7C5CFF','lineColor':'#6B7280','secondaryColor':'#EFF6FF','tertiaryColor':'#ECFDF5'}}}%%
+flowchart LR
+  V1["0.1 · check layer"] --> V2["0.2 · init"] --> V3["0.3 · reports"] --> V4["0.4 · contract / MCP"] --> V5["0.5 · package ledgers"] --> V6["0.6 · visual evidence"]
+  V6 -.-> NEXT["Next candidates: skill distribution / visual refinement / cross-repo dashboard"]
+  classDef done fill:#ECFDF5,stroke:#10B981,color:#065F46;
+  classDef current fill:#F5F3FF,stroke:#7C5CFF,color:#4C1D95,stroke-width:2px;
+  classDef next fill:#F9FAFB,stroke:#D1D5DB,color:#6B7280,stroke-dasharray:4 4;
+  class V1,V2,V3,V4,V5 done;
+  class V6 current;
+  class NEXT next;
+```
+
+Green is completed, purple is the current release, and the dashed gray node is a candidate.
+
 ## Shipped
 
 - **0.1.x** — check layer (seven checks), baseline ratchet, MCP workflow, fast / full profiles, `doctor`, monorepo and Vue support, `not-executed`.
@@ -45,6 +64,7 @@ Acceptance results:
 - `evidenceKind` is recorded and readable via `task status` / `task status --json` without new runtime dependencies.
 - `visualDiff.command` never starts a browser or installs a package; a missing command is "not executed", never a pass.
 - Tests: `npm test` passes 191; `verify-v4.mjs` reaches 80 assertions (v1 37 / v2 135 / v3 83 / v4 80).
+- Docs and diagrams: README, the promotion article, the roadmap and the bilingual SVGs under `docs/assets` are updated.
 
 Not included: built-in browser automation, a pixel-diff implementation, mobile / real-device checks, per-criterion mapping to multiple visual commands.
 
